@@ -175,7 +175,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div
           className={`h-16 flex items-center justify-between ${
             isCollapsed ? "px-2" : "px-6"
-          } border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white`}
+          } border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white dark:text-gray-900`}
         >
           <div className="flex items-center overflow-hidden">
             <img

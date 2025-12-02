@@ -28,28 +28,70 @@ export function ThemeProvider({
   storageKey = "hrgroup-attendance-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
+  const [theme, setThemeState] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
 
+  // Listen for auth changes to switch theme preference per user
+  useEffect(() => {
+    // We need to import auth dynamically or pass it in, but since we have a global auth instance:
+    // This assumes auth is initialized.
+    const { auth } = require("@/lib/firebase");
+    const { onAuthStateChanged } = require("firebase/auth");
+
+    const unsubscribe = onAuthStateChanged(auth, (user: any) => {
+      if (user) {
+        const userKey = `${storageKey}-${user.uid}`;
+        const savedTheme = localStorage.getItem(userKey) as Theme;
+        if (savedTheme) {
+          setThemeState(savedTheme);
+        } else {
+          // If no saved theme for this user, use default but don't save yet
+          // or maybe inherit current? Let's use default.
+          setThemeState(defaultTheme);
+        }
+      } else {
+        // No user, revert to default or global storage
+        // For now, let's just go to default to be safe
+        setThemeState(defaultTheme);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [defaultTheme, storageKey]);
+
   useEffect(() => {
     const root = window.document.documentElement;
-
     root.classList.remove("light", "dark");
-
     root.classList.add(theme);
   }, [theme]);
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    setTheme: (newTheme: Theme) => {
+      const { auth } = require("@/lib/firebase");
+      const user = auth.currentUser;
+
+      if (user) {
+        const userKey = `${storageKey}-${user.uid}`;
+        localStorage.setItem(userKey, newTheme);
+      } else {
+        localStorage.setItem(storageKey, newTheme);
+      }
+      setThemeState(newTheme);
     },
     toggleTheme: () => {
+      const { auth } = require("@/lib/firebase");
+      const user = auth.currentUser;
       const newTheme = theme === "light" ? "dark" : "light";
-      localStorage.setItem(storageKey, newTheme);
-      setTheme(newTheme);
+
+      if (user) {
+        const userKey = `${storageKey}-${user.uid}`;
+        localStorage.setItem(userKey, newTheme);
+      } else {
+        localStorage.setItem(storageKey, newTheme);
+      }
+      setThemeState(newTheme);
     },
   };
 
