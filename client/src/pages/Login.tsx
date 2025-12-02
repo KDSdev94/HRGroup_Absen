@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   sendPasswordResetEmail,
+  confirmPasswordReset,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,70 @@ export default function Login() {
   const [showForgotDialog, setShowForgotDialog] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [isResetting, setIsResetting] = useState(false);
+
+  // PASSWORD RESET CONFIRMATION STATE
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+
+  // Check for reset password code in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oobCode = params.get("oobCode");
+    const mode = params.get("mode");
+
+    if (oobCode && mode === "resetPassword") {
+      setResetCode(oobCode);
+      setShowResetPasswordDialog(true);
+    }
+  }, []);
+
+  const handleConfirmResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Password tidak cocok.",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Password harus minimal 6 karakter.",
+      });
+      return;
+    }
+
+    setIsConfirmingReset(true);
+    try {
+      await confirmPasswordReset(auth, resetCode, newPassword);
+      toast({
+        title: "Sukses",
+        description:
+          "Password berhasil diubah. Silakan login dengan password baru.",
+      });
+      setShowResetPasswordDialog(false);
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast({
+        variant: "destructive",
+        title: "Gagal Mengubah Password",
+        description:
+          error.message ||
+          "Link reset password tidak valid atau sudah kadaluarsa.",
+      });
+    } finally {
+      setIsConfirmingReset(false);
+    }
+  };
 
   // SLIDER GAMBAR - Using hero images from public folder
   const images = ["/onboard.avif", "/onboard1.avif", "/onboard2.avif"];
@@ -327,6 +392,58 @@ export default function Login() {
                   </>
                 ) : (
                   "Kirim Link Reset"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {/* RESET PASSWORD CONFIRMATION DIALOG */}
+      <Dialog
+        open={showResetPasswordDialog}
+        onOpenChange={setShowResetPasswordDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buat Kata Sandi Baru</DialogTitle>
+            <DialogDescription>
+              Silakan masukkan kata sandi baru untuk akun Anda.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleConfirmResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Kata Sandi Baru</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Minimal 6 karakter"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-new-password">
+                Konfirmasi Kata Sandi
+              </Label>
+              <Input
+                id="confirm-new-password"
+                type="password"
+                placeholder="Ulangi kata sandi baru"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="submit" disabled={isConfirmingReset}>
+                {isConfirmingReset ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Password Baru"
                 )}
               </Button>
             </div>
