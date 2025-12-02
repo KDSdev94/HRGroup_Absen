@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, QrCode, Search, Download, Trash2, Pencil } from "lucide-react";
 import QRCode from "react-qr-code";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import {
   collection,
   addDoc,
@@ -97,6 +97,30 @@ export default function Employees() {
     }
   };
 
+  const logActivity = async (
+    employeeName: string,
+    action: string,
+    type: "add-employee" | "edit-employee",
+    division: string
+  ) => {
+    try {
+      const adminEmail = auth.currentUser?.email || "Unknown";
+      const timestamp = new Date().toISOString();
+
+      await addDoc(collection(db, "activities"), {
+        employeeName,
+        employeeId: formData.employeeId,
+        action,
+        type,
+        division,
+        adminEmail,
+        timestamp,
+      });
+    } catch (error) {
+      console.error("Error logging activity:", error);
+    }
+  };
+
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -109,6 +133,14 @@ export default function Employees() {
         name: formData.name,
         division: formData.division,
       });
+
+      // Log activity
+      await logActivity(
+        formData.name,
+        `Menambahkan karyawan baru: ${formData.name} (${formData.employeeId})`,
+        "add-employee",
+        formData.division
+      );
 
       toast({
         title: "Employee Added",
@@ -142,11 +174,29 @@ export default function Employees() {
 
     try {
       const employeeRef = doc(db, "employees", editingId);
+      const oldData = employees.find((emp) => emp.id === editingId);
+
       await updateDoc(employeeRef, {
         name: formData.name,
         division: formData.division,
         // Note: employeeId (document ID) cannot be changed easily in Firestore
       });
+
+      // Log activity
+      const changes = [];
+      if (oldData?.name !== formData.name) {
+        changes.push(`nama: ${oldData?.name} → ${formData.name}`);
+      }
+      if (oldData?.division !== formData.division) {
+        changes.push(`divisi: ${oldData?.division} → ${formData.division}`);
+      }
+
+      await logActivity(
+        formData.name,
+        `Mengedit data karyawan. Perubahan: ${changes.join(", ")}`,
+        "edit-employee",
+        formData.division
+      );
 
       toast({
         title: "Employee Updated",

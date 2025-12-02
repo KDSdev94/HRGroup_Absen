@@ -1,8 +1,14 @@
 # Netlify Configuration for HRGroup Attendance QR
 
 [build]
-  command = "npm run build"
+  # Run the main build script which builds both client and server
+  command = "npm install && npm run build"
+  # Publish the Vite build output (client only)
   publish = "dist/public"
+  
+[build.environment]
+  # Node version for consistent builds
+  NODE_VERSION = "20"
 
 # Handle SPA routing - all URLs that don't have a file extension
 # should be served by index.html (React Router will handle the routing)
