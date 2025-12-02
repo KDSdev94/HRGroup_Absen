@@ -4,7 +4,13 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -87,8 +93,8 @@ export default function Login() {
                   className="bg-white dark:bg-gray-950"
                 />
               </div>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full font-medium"
                 disabled={isLoading}
               >
@@ -102,6 +108,15 @@ export default function Login() {
                 )}
               </Button>
             </form>
+            <div className="mt-4 text-center text-sm">
+              <span className="text-gray-500">Don't have an account? </span>
+              <a
+                href="/register"
+                className="text-primary hover:underline font-medium"
+              >
+                Register
+              </a>
+            </div>
             <div className="mt-4 text-center text-xs text-gray-500">
               <p>Demo Account: Use any valid Firebase credentials</p>
             </div>

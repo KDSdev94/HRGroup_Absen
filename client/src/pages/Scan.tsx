@@ -22,14 +22,14 @@ export default function Scan() {
       const timer = setTimeout(() => {
         const scanner = new Html5QrcodeScanner(
           "reader",
-          { 
-            fps: 10, 
+          {
+            fps: 10,
             qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0 
+            aspectRatio: 1.0,
           },
           /* verbose= */ false
         );
-        
+
         scanner.render(onScanSuccess, onScanFailure);
         scannerRef.current = scanner;
       }, 100);
@@ -48,7 +48,7 @@ export default function Scan() {
 
   const onScanSuccess = async (decodedText: string, decodedResult: any) => {
     if (processing) return;
-    
+
     // Stop scanning temporarily
     if (scannerRef.current) {
       scannerRef.current.clear();
@@ -59,32 +59,58 @@ export default function Scan() {
 
     try {
       const data = JSON.parse(decodedText);
-      if (!data.id || !data.nik) throw new Error("Invalid QR Code");
+      if (!data.id || !data.name) throw new Error("Invalid QR Code");
+
+      // Get Location
+      const location = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error("Geolocation is not supported by your browser"));
+          } else {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+          }
+        }
+      );
+
+      const { latitude, longitude } = location.coords;
 
       setScanResult(data);
-      
-      // Log attendance to Firebase
+
+      // Log attendance to Firebase with Location
       await addDoc(collection(db, "attendance"), {
         employeeId: data.id,
         employeeName: data.name,
-        nik: data.nik,
+        division: data.division,
         timestamp: serverTimestamp(),
-        date: new Date().toISOString().split('T')[0],
-        type: 'check-in' // simplified logic for now
+        date: new Date().toISOString().split("T")[0],
+        type: "check-in",
+        location: {
+          latitude,
+          longitude,
+        },
       });
 
       toast({
         title: "Attendance Recorded",
-        description: `Welcome, ${data.name}!`,
+        description: `Welcome, ${data.name}! Location recorded.`,
       });
-
-    } catch (error) {
+    } catch (error: any) {
       console.error("Scan error", error);
-      setScanResult({ error: "Invalid QR Code format" });
+      let errorMessage = "Could not recognize employee QR code.";
+
+      if (error.code === 1) {
+        // PERMISSION_DENIED
+        errorMessage =
+          "Location permission denied. Please enable location services.";
+      } else if (error.message === "Invalid QR Code") {
+        errorMessage = "Invalid QR Code format.";
+      }
+
+      setScanResult({ error: errorMessage });
       toast({
         variant: "destructive",
         title: "Scan Failed",
-        description: "Could not recognize employee QR code."
+        description: errorMessage,
       });
     } finally {
       setProcessing(false);
@@ -92,7 +118,7 @@ export default function Scan() {
   };
 
   const onScanFailure = (error: any) => {
-    // handle scan failure, usually better to ignore as it triggers on every frame
+    // handle scan failure
   };
 
   const resetScan = () => {
@@ -103,8 +129,12 @@ export default function Scan() {
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Scan Attendance</h1>
-        <p className="text-gray-500 mt-2">Place the QR code within the frame to check in/out.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+          Scan Attendance
+        </h1>
+        <p className="text-gray-500 mt-2">
+          Place the QR code within the frame to check in/out.
+        </p>
       </div>
 
       <Card className="overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-xl">
@@ -112,14 +142,18 @@ export default function Scan() {
           {isScanning ? (
             <div className="bg-black relative min-h-[400px] flex flex-col items-center justify-center text-white">
               <div id="reader" className="w-full"></div>
-              <p className="text-sm text-gray-400 absolute bottom-4">Ensure good lighting for best results</p>
+              <p className="text-sm text-gray-400 absolute bottom-4">
+                Ensure good lighting for best results
+              </p>
             </div>
           ) : (
             <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center space-y-6 bg-gray-50/50">
               {processing ? (
                 <div className="flex flex-col items-center gap-4">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-lg font-medium text-gray-600">Processing attendance...</p>
+                  <p className="text-lg font-medium text-gray-600">
+                    Processing attendance...
+                  </p>
                 </div>
               ) : scanResult?.error ? (
                 <>
@@ -127,7 +161,9 @@ export default function Scan() {
                     <AlertTriangle className="h-10 w-10" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Scan Failed</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Scan Failed
+                    </h2>
                     <p className="text-gray-500 mt-1">{scanResult.error}</p>
                   </div>
                   <Button onClick={resetScan} size="lg" className="mt-4">
@@ -140,19 +176,35 @@ export default function Scan() {
                     <CheckCircle2 className="h-10 w-10" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Check In Successful!</h2>
-                    <p className="text-gray-500 mt-1">Recorded at {new Date().toLocaleTimeString()}</p>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Check In Successful!
+                    </h2>
+                    <p className="text-gray-500 mt-1">
+                      Recorded at {new Date().toLocaleTimeString()}
+                    </p>
                   </div>
-                  
+
                   <Card className="w-full max-w-xs border-dashed bg-white">
                     <CardContent className="p-4 text-left space-y-2">
                       <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold">Name</span>
+                        <span className="text-xs text-gray-400 uppercase font-bold">
+                          Name
+                        </span>
                         <p className="font-medium">{scanResult?.name}</p>
                       </div>
                       <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold">ID</span>
-                        <p className="font-mono text-sm">{scanResult?.nik}</p>
+                        <span className="text-xs text-gray-400 uppercase font-bold">
+                          Division
+                        </span>
+                        <p className="text-sm">{scanResult?.division}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-400 uppercase font-bold">
+                          Employee ID
+                        </span>
+                        <p className="font-mono text-xs text-gray-600">
+                          {scanResult?.id}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>

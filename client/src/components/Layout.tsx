@@ -1,32 +1,59 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  Users, 
-  QrCode, 
-  FileText, 
-  LogOut, 
-  Menu, 
+import {
+  LayoutDashboard,
+  Users,
+  QrCode,
+  FileText,
+  LogOut,
+  Menu,
   X,
-  CheckCircle2
+  CheckCircle2,
+  UserCircle,
+  History,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser && location !== "/login") {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser && location !== "/login" && location !== "/register") {
         setLocation("/login");
       } else {
         setUser(currentUser);
+        if (currentUser) {
+          // Fetch user role
+          try {
+            const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            if (userDoc.exists()) {
+              setRole(userDoc.data().role);
+            } else {
+              // Fallback if no role found (e.g. old admin account)
+              // Assuming admin@hrgroup.com is always superadmin (panel admin)
+              if (currentUser.email === "admin@hrgroup.com") {
+                setRole("superadmin");
+              } else {
+                // Default to employee role for new users without explicit role
+                setRole("employee");
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching user role:", error);
+          }
+        } else {
+          setRole(null);
+        }
       }
     });
     return () => unsubscribe();
@@ -45,34 +72,73 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (location === "/login") {
+  if (location === "/login" || location === "/register") {
     return <>{children}</>;
   }
 
-  const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-    { icon: Users, label: "Employees", href: "/employees" },
-    { icon: QrCode, label: "Scan Attendance", href: "/scan" },
-    { icon: FileText, label: "Reports", href: "/reports" },
+  const allNavItems = [
+    {
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      href: "/",
+      roles: ["superadmin", "admin", "employee"],
+    },
+    {
+      icon: Users,
+      label: "Employees",
+      href: "/employees",
+      roles: ["superadmin", "admin"],
+    },
+    {
+      icon: Shield,
+      label: "Admins",
+      href: "/admins",
+      roles: ["superadmin"],
+    },
+    {
+      icon: QrCode,
+      label: "Scan Attendance",
+      href: "/scan",
+      roles: ["superadmin", "admin", "employee"],
+    },
+    {
+      icon: History,
+      label: "Attendance History",
+      href: "/attendance-history",
+      roles: ["employee"],
+    },
+    {
+      icon: FileText,
+      label: "Reports",
+      href: "/reports",
+      roles: ["superadmin", "admin"],
+    },
+    // Add more employee specific routes here if needed
   ];
+
+  const navItems = allNavItems.filter(
+    (item) => role && item.roles.includes(role)
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
           w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
           transform transition-transform duration-200 ease-in-out
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }
         `}
       >
         <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700">
@@ -80,7 +146,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <CheckCircle2 className="h-6 w-6" />
             <span>AttendanceQR</span>
           </div>
-          <button 
+          <button
             className="ml-auto lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
@@ -93,12 +159,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             const isActive = location === item.href;
             return (
               <Link key={item.href} href={item.href}>
-                <a 
+                <a
                   className={`
                     flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors
-                    ${isActive 
-                      ? "bg-primary/10 text-primary" 
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50"}
+                    ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                    }
                   `}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -113,17 +181,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3 px-4 py-3 mb-2">
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-              {user?.email?.[0]?.toUpperCase() || "A"}
+              {user?.email?.[0]?.toUpperCase() || "U"}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
-                {user?.email || "Admin"}
+                {user?.email || "User"}
               </p>
-              <p className="text-xs text-gray-500 truncate">Administrator</p>
+              <p className="text-xs text-gray-500 truncate capitalize">
+                {role || "Loading..."}
+              </p>
             </div>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full justify-start gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100"
             onClick={handleLogout}
           >
@@ -136,22 +206,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
         <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 lg:px-8 justify-between lg:justify-end">
-          <button 
+          <button
             className="lg:hidden p-2 -ml-2 text-gray-600"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-6 w-6" />
           </button>
-          
+
           <div className="hidden lg:flex items-center gap-4 text-sm text-gray-500">
-            <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span>
+              {new Date().toLocaleDateString("id-ID", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
           </div>
         </header>
 
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <div className="max-w-6xl mx-auto">
-            {children}
-          </div>
+          <div className="max-w-6xl mx-auto">{children}</div>
         </main>
       </div>
     </div>

@@ -15,10 +15,10 @@ export default defineConfig({
     process.env.REPL_ID !== undefined
       ? [
           await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
+            m.cartographer()
           ),
           await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
+            m.devBanner()
           ),
         ]
       : []),
@@ -41,10 +41,17 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    port: 3000,
     host: "0.0.0.0",
     allowedHosts: true,
     fs: {
       strict: true,
+      allow: [
+        // Allow serving files from the project root
+        path.resolve(import.meta.dirname),
+        // Allow serving files from node_modules
+        path.resolve(import.meta.dirname, "node_modules"),
+      ],
       deny: ["**/.*"],
     },
   },
