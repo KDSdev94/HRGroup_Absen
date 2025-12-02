@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type Theme = "light" | "dark";
 
@@ -36,9 +38,6 @@ export function ThemeProvider({
   useEffect(() => {
     // We need to import auth dynamically or pass it in, but since we have a global auth instance:
     // This assumes auth is initialized.
-    const { auth } = require("@/lib/firebase");
-    const { onAuthStateChanged } = require("firebase/auth");
-
     const unsubscribe = onAuthStateChanged(auth, (user: any) => {
       if (user) {
         const userKey = `${storageKey}-${user.uid}`;
@@ -69,7 +68,6 @@ export function ThemeProvider({
   const value = {
     theme,
     setTheme: (newTheme: Theme) => {
-      const { auth } = require("@/lib/firebase");
       const user = auth.currentUser;
 
       if (user) {
@@ -81,7 +79,6 @@ export function ThemeProvider({
       setThemeState(newTheme);
     },
     toggleTheme: () => {
-      const { auth } = require("@/lib/firebase");
       const user = auth.currentUser;
       const newTheme = theme === "light" ? "dark" : "light";
 
