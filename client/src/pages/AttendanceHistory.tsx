@@ -75,7 +75,7 @@ export default function AttendanceHistory() {
         setLoading(false);
         toast({
           title: "Error",
-          description: "Please log in to view attendance history",
+          description: "Silakan masuk untuk melihat riwayat kehadiran",
           variant: "destructive",
         });
       }
@@ -114,7 +114,7 @@ export default function AttendanceHistory() {
       if (!currentUser) {
         toast({
           title: "Error",
-          description: "User not authenticated",
+          description: "Pengguna tidak terautentikasi",
           variant: "destructive",
         });
         return;
@@ -197,7 +197,7 @@ export default function AttendanceHistory() {
         toast({
           title: "Error",
           description:
-            "Employee profile not found. Please contact admin to link your account.",
+            "Profil karyawan tidak ditemukan. Silakan hubungi admin untuk menghubungkan akun Anda.",
           variant: "destructive",
         });
         return;
@@ -236,7 +236,7 @@ export default function AttendanceHistory() {
       console.error("Error fetching attendance history:", error);
       toast({
         title: "Error",
-        description: "Failed to load attendance history",
+        description: "Gagal memuat riwayat kehadiran",
         variant: "destructive",
       });
     } finally {
@@ -261,6 +261,7 @@ export default function AttendanceHistory() {
       year: "numeric",
       month: "long",
       day: "numeric",
+      timeZone: "Asia/Jakarta",
     });
   };
 
@@ -289,25 +290,27 @@ export default function AttendanceHistory() {
         date = timestamp;
       } else {
         console.error("Unknown timestamp format:", timestamp);
-        return "Invalid time";
+        return "Waktu tidak valid";
       }
 
       // Check if date is valid
       if (isNaN(date.getTime())) {
         console.error("Invalid date created from timestamp:", timestamp);
-        return "Invalid time";
+        return "Waktu tidak valid";
       }
 
       // Format with WIB timezone (Asia/Jakarta)
-      return date.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Jakarta",
-        hour12: false,
-      });
+      return (
+        date.toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Jakarta",
+          hour12: false,
+        }) + " WIB"
+      );
     } catch (error) {
       console.error("Error formatting time:", error, "Timestamp:", timestamp);
-      return "Invalid time";
+      return "Waktu tidak valid";
     }
   };
 
@@ -352,22 +355,22 @@ export default function AttendanceHistory() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Attendance History
+          Riwayat Kehadiran
         </h1>
         <p className="text-gray-500 mt-2">
-          View your attendance records and check-in locations.
+          Lihat catatan kehadiran dan lokasi check-in Anda.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Filter & Search</CardTitle>
+          <CardTitle>Filter & Pencarian</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">
-                Filter by Date
+                Filter berdasarkan Tanggal
               </label>
               <Input
                 type="date"
@@ -383,7 +386,7 @@ export default function AttendanceHistory() {
                   onClick={() => setFilterDate("")}
                   className="gap-2"
                 >
-                  Clear Filter
+                  Bersihkan Filter
                 </Button>
               </div>
             )}
@@ -393,19 +396,19 @@ export default function AttendanceHistory() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Attendance Records ({filteredRecords.length})</CardTitle>
+          <CardTitle>Catatan Kehadiran ({filteredRecords.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">Loading attendance history...</p>
+              <p className="text-gray-500">Memuat riwayat kehadiran...</p>
             </div>
           ) : filteredRecords.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">
                 {records.length === 0
-                  ? "No attendance records found."
-                  : "No records match the selected date."}
+                  ? "Tidak ada catatan kehadiran ditemukan."
+                  : "Tidak ada catatan yang cocok dengan tanggal yang dipilih."}
               </p>
             </div>
           ) : (
@@ -413,11 +416,11 @@ export default function AttendanceHistory() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Waktu</TableHead>
+                    <TableHead>Tipe</TableHead>
+                    <TableHead>Lokasi</TableHead>
+                    <TableHead>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -450,8 +453,7 @@ export default function AttendanceHistory() {
                               className="text-sm text-gray-700 dark:text-gray-300 truncate"
                               title={recordAddresses[record.id]}
                             >
-                              {recordAddresses[record.id] ||
-                                "Loading address..."}
+                              {recordAddresses[record.id] || "Memuat alamat..."}
                             </span>
                           </div>
                         ) : (
@@ -467,7 +469,7 @@ export default function AttendanceHistory() {
                             className="gap-2"
                           >
                             <Eye className="h-4 w-4" />
-                            View Map
+                            Lihat Peta
                           </Button>
                         )}
                       </TableCell>
@@ -489,20 +491,20 @@ export default function AttendanceHistory() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                Location - {formatDate(selectedRecord.date)}
+                Lokasi - {formatDate(selectedRecord.date)}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                 <div>
-                  <p className="text-sm text-gray-500">Coordinates</p>
+                  <p className="text-sm text-gray-500">Koordinat</p>
                   <p className="font-mono font-semibold">
                     {selectedRecord.location.latitude.toFixed(6)},{" "}
                     {selectedRecord.location.longitude.toFixed(6)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Time</p>
+                  <p className="text-sm text-gray-500">Waktu</p>
                   <p className="font-semibold">
                     {formatTime(selectedRecord.timestamp)}
                   </p>
@@ -519,7 +521,7 @@ export default function AttendanceHistory() {
                   className="gap-2"
                 >
                   <MapPin className="h-4 w-4" />
-                  Open in Google Maps
+                  Buka di Google Maps
                 </Button>
                 <Button
                   variant="outline"
@@ -530,12 +532,12 @@ export default function AttendanceHistory() {
                       }`
                     );
                     toast({
-                      title: "Copied",
-                      description: "Coordinates copied to clipboard",
+                      title: "Tersalin",
+                      description: "Koordinat disalin ke clipboard",
                     });
                   }}
                 >
-                  Copy Coordinates
+                  Salin Koordinat
                 </Button>
               </div>
             </div>

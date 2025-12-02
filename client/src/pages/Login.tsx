@@ -50,7 +50,7 @@ export default function Login() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter your email address.",
+        description: "Harap masukkan alamat email Anda.",
       });
       return;
     }
@@ -61,20 +61,20 @@ export default function Login() {
       await sendPasswordResetEmail(auth, resetEmail);
       console.log("Reset email sent successfully");
       toast({
-        title: "Check your email",
+        title: "Cek email Anda",
         description:
-          "If an account exists, a password reset link has been sent. Check your spam folder too.",
+          "Jika akun ada, link reset password telah dikirim. Cek juga folder spam Anda.",
         duration: 5000,
       });
       setShowForgotDialog(false);
       setResetEmail("");
     } catch (error: any) {
       console.error("Error sending reset email:", error);
-      let errorMessage = "Failed to send reset email.";
+      let errorMessage = "Gagal mengirim email reset.";
       if (error.code === "auth/user-not-found") {
-        errorMessage = "No account found with this email address.";
+        errorMessage = "Tidak ada akun ditemukan dengan alamat email ini.";
       } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Invalid email address format.";
+        errorMessage = "Format alamat email tidak valid.";
       }
 
       toast({
@@ -98,13 +98,13 @@ export default function Login() {
       if (remember) localStorage.setItem("remember", email);
       else localStorage.removeItem("remember");
 
-      toast({ title: "Success", description: "Welcome back!" });
+      toast({ title: "Berhasil", description: "Selamat datang kembali!" });
       setLocation("/");
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Login Failed",
-        description: error.message || "Invalid email or password.",
+        title: "Login Gagal",
+        description: error.message || "Email atau password salah.",
       });
     } finally {
       setIsLoading(false);
@@ -114,12 +114,15 @@ export default function Login() {
   const handleGoogle = async () => {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
-      toast({ title: "Success", description: "Logged in with Google!" });
+      toast({
+        title: "Berhasil",
+        description: "Masuk dengan Google berhasil!",
+      });
       setLocation("/");
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Google Login Failed",
+        title: "Login Google Gagal",
         description: error.message,
       });
     }
@@ -141,7 +144,7 @@ export default function Login() {
           href="/register"
           className="px-5 py-1.5 bg-black text-white rounded-full text-xs md:text-sm"
         >
-          Login
+          Masuk
         </a>
       </div>
 
@@ -184,20 +187,20 @@ export default function Login() {
       >
         <div className="w-full max-w-md">
           <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] mb-1">
-            Welcome Back!
+            Selamat Datang Kembali!
           </h1>
           <p className="text-gray-500 mb-8 md:mb-10">
-            Sign in to your HRGroup account
+            Masuk ke akun HRGroup Anda
           </p>
 
           {/* FORM */}
           <form onSubmit={handleLogin} className="space-y-6">
             {/* EMAIL */}
             <div className="space-y-2">
-              <Label>Email Address</Label>
+              <Label>Alamat Email</Label>
               <Input
                 type="email"
-                placeholder="Enter email"
+                placeholder="Masukkan email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-12"
@@ -206,10 +209,10 @@ export default function Login() {
 
             {/* PASSWORD */}
             <div className="space-y-2 relative">
-              <Label>Password</Label>
+              <Label>Kata Sandi</Label>
               <Input
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter password"
+                placeholder="Masukkan kata sandi"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-12 pr-10"
@@ -234,14 +237,14 @@ export default function Login() {
                   onChange={(e) => setRemember(e.target.checked)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm text-gray-600">Remember Me</span>
+                <span className="text-sm text-gray-600">Ingat Saya</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowForgotDialog(true)}
                 className="text-sm text-blue-600 hover:underline font-medium"
               >
-                Forgot Password?
+                Lupa Kata Sandi?
               </button>
             </div>
 
@@ -253,17 +256,17 @@ export default function Login() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Masuk…
                 </>
               ) : (
-                "Login"
+                "Masuk"
               )}
             </Button>
           </form>
 
           {/* INSTANT LOGIN */}
           <div className="my-4 flex items-center justify-center text-gray-500 text-sm">
-            <span className="px-4">Instant Login</span>
+            <span className="px-4">Login Instan</span>
           </div>
 
           <Button
@@ -271,13 +274,13 @@ export default function Login() {
             className="w-full h-12 bg-white border text-black hover:bg-gray-100"
           >
             <img src="/google.png" alt="g" className="h-5 mr-2" />
-            Continue with Google
+            Lanjutkan dengan Google
           </Button>
 
           <div className="mt-6 text-center text-sm">
-            Don't have an account?{" "}
+            Belum punya akun?{" "}
             <a href="/register" className="text-blue-600 hover:underline">
-              Register
+              Daftar
             </a>
           </div>
         </div>
@@ -287,19 +290,19 @@ export default function Login() {
       <Dialog open={showForgotDialog} onOpenChange={setShowForgotDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
+            <DialogTitle>Reset Kata Sandi</DialogTitle>
             <DialogDescription>
-              Enter your email address and we'll send you a link to reset your
-              password.
+              Masukkan alamat email Anda dan kami akan mengirimkan link untuk
+              reset kata sandi Anda.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="reset-email">Email Address</Label>
+              <Label htmlFor="reset-email">Alamat Email</Label>
               <Input
                 id="reset-email"
                 type="email"
-                placeholder="Enter your email"
+                placeholder="Masukkan email Anda"
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 required
@@ -311,15 +314,16 @@ export default function Login() {
                 variant="outline"
                 onClick={() => setShowForgotDialog(false)}
               >
-                Cancel
+                Batal
               </Button>
               <Button type="submit" disabled={isResetting}>
                 {isResetting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                    Mengirim...
                   </>
                 ) : (
-                  "Send Reset Link"
+                  "Kirim Link Reset"
                 )}
               </Button>
             </div>

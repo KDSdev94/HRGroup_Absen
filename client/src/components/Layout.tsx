@@ -199,9 +199,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Tooltip key={item.href}>
                   <TooltipTrigger asChild>
                     <Link href={item.href}>
-                      <a
+                      <div
                         className={`
-                          flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200
+                          flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer
                           ${
                             isActive
                               ? "bg-primary/10 text-primary"
@@ -223,7 +223,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         >
                           {item.label}
                         </span>
-                      </a>
+                      </div>
                     </Link>
                   </TooltipTrigger>
                   {isCollapsed && (

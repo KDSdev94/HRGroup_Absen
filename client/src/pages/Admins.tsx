@@ -36,6 +36,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
+import { formatDateTable } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 
 interface Admin {
@@ -83,7 +84,7 @@ export default function Admins() {
       console.error("Error fetching admins:", error);
       toast({
         title: "Error",
-        description: "Failed to load admin list",
+        description: "Gagal memuat daftar admin",
         variant: "destructive",
       });
     } finally {
@@ -97,7 +98,7 @@ export default function Admins() {
     if (!formData.email || !formData.displayName || !formData.password) {
       toast({
         title: "Error",
-        description: "Please fill in all fields",
+        description: "Harap isi semua kolom",
         variant: "destructive",
       });
       return;
@@ -123,8 +124,8 @@ export default function Admins() {
       });
 
       toast({
-        title: "Success",
-        description: `Admin ${formData.displayName} created successfully`,
+        title: "Berhasil",
+        description: `Admin ${formData.displayName} berhasil dibuat`,
       });
 
       setFormData({ email: "", displayName: "", password: "" });
@@ -132,12 +133,12 @@ export default function Admins() {
       fetchAdmins();
     } catch (error: any) {
       console.error("Error creating admin:", error);
-      let errorMessage = "Failed to create admin";
+      let errorMessage = "Gagal membuat admin";
 
       if (error.code === "auth/email-already-in-use") {
-        errorMessage = "Email already in use";
+        errorMessage = "Email sudah digunakan";
       } else if (error.code === "auth/weak-password") {
-        errorMessage = "Password is too weak";
+        errorMessage = "Password terlalu lemah";
       }
 
       toast({
@@ -154,7 +155,7 @@ export default function Admins() {
     if (!selectedAdmin || !formData.displayName) {
       toast({
         title: "Error",
-        description: "Please fill in required fields",
+        description: "Harap isi kolom yang diperlukan",
         variant: "destructive",
       });
       return;
@@ -168,8 +169,8 @@ export default function Admins() {
       });
 
       toast({
-        title: "Success",
-        description: "Admin updated successfully",
+        title: "Berhasil",
+        description: "Admin berhasil diperbarui",
       });
 
       setFormData({ email: "", displayName: "", password: "" });
@@ -180,22 +181,22 @@ export default function Admins() {
       console.error("Error updating admin:", error);
       toast({
         title: "Error",
-        description: "Failed to update admin",
+        description: "Gagal memperbarui admin",
         variant: "destructive",
       });
     }
   };
 
   const handleDeleteAdmin = async (adminId: string, adminEmail: string) => {
-    if (!confirm(`Are you sure you want to delete ${adminEmail}?`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${adminEmail}?`)) return;
 
     try {
       // Delete from Firestore
       await deleteDoc(doc(db, "users", adminId));
 
       toast({
-        title: "Success",
-        description: "Admin deleted successfully",
+        title: "Berhasil",
+        description: "Admin berhasil dihapus",
       });
 
       fetchAdmins();
@@ -203,7 +204,7 @@ export default function Admins() {
       console.error("Error deleting admin:", error);
       toast({
         title: "Error",
-        description: "Failed to delete admin",
+        description: "Gagal menghapus admin",
         variant: "destructive",
       });
     }
@@ -225,27 +226,15 @@ export default function Admins() {
       admin.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return "-";
-    const date = new Date(timestamp.seconds * 1000);
-    return date.toLocaleDateString("id-ID", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Manage Admins
+          Kelola Admin
         </h1>
         <p className="text-gray-500 mt-2">
-          Create, edit, and delete admin accounts. Admins have full access to
-          the system.
+          Buat, edit, dan hapus akun admin. Admin memiliki akses penuh ke
+          sistem.
         </p>
       </div>
 
@@ -254,12 +243,12 @@ export default function Admins() {
         <DialogTrigger asChild>
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
-            Add Admin
+            Tambah Admin
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Admin</DialogTitle>
+            <DialogTitle>Buat Admin Baru</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddAdmin} className="space-y-4 mt-4">
             <div>
@@ -267,7 +256,7 @@ export default function Admins() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder="admin@contoh.com"
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
@@ -276,11 +265,11 @@ export default function Admins() {
               />
             </div>
             <div>
-              <Label htmlFor="displayName">Name</Label>
+              <Label htmlFor="displayName">Nama</Label>
               <Input
                 id="displayName"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Budi Santoso"
                 value={formData.displayName}
                 onChange={(e) =>
                   setFormData({ ...formData, displayName: e.target.value })
@@ -289,11 +278,11 @@ export default function Admins() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Kata Sandi</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter password"
+                placeholder="Masukkan kata sandi"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
@@ -302,7 +291,7 @@ export default function Admins() {
               />
             </div>
             <Button type="submit" className="w-full">
-              Create Admin
+              Buat Admin
             </Button>
           </form>
         </DialogContent>
@@ -311,7 +300,7 @@ export default function Admins() {
       {/* Search Bar */}
       <div>
         <Input
-          placeholder="Search by email or name..."
+          placeholder="Cari berdasarkan email atau nama..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
@@ -321,19 +310,19 @@ export default function Admins() {
       {/* Admins Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Admin Accounts ({filteredAdmins.length})</CardTitle>
+          <CardTitle>Akun Admin ({filteredAdmins.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">Loading admin list...</p>
+              <p className="text-gray-500">Memuat daftar admin...</p>
             </div>
           ) : filteredAdmins.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">
                 {admins.length === 0
-                  ? "No admins found."
-                  : "No admins match the search."}
+                  ? "Tidak ada admin ditemukan."
+                  : "Tidak ada admin yang cocok dengan pencarian."}
               </p>
             </div>
           ) : (
@@ -341,11 +330,11 @@ export default function Admins() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>Nama</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>Dibuat</TableHead>
+                    <TableHead>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -369,7 +358,7 @@ export default function Admins() {
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {formatDate(admin.createdAt)}
+                        {formatDateTable(admin.createdAt)}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
@@ -380,7 +369,7 @@ export default function Admins() {
                             className="gap-2"
                           >
                             <Edit2 className="h-4 w-4" />
-                            Edit
+                            Ubah
                           </Button>
                           <Button
                             variant="outline"
@@ -391,7 +380,7 @@ export default function Admins() {
                             className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100"
                           >
                             <Trash2 className="h-4 w-4" />
-                            Delete
+                            Hapus
                           </Button>
                         </div>
                       </TableCell>
@@ -409,7 +398,7 @@ export default function Admins() {
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Admin</DialogTitle>
+              <DialogTitle>Ubah Admin</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleUpdateAdmin} className="space-y-4 mt-4">
               <div>
@@ -422,11 +411,11 @@ export default function Admins() {
                   className="bg-gray-100 dark:bg-gray-800"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Email cannot be changed
+                  Email tidak dapat diubah
                 </p>
               </div>
               <div>
-                <Label htmlFor="edit-displayName">Name</Label>
+                <Label htmlFor="edit-displayName">Nama</Label>
                 <Input
                   id="edit-displayName"
                   type="text"
@@ -438,7 +427,7 @@ export default function Admins() {
                 />
               </div>
               <Button type="submit" className="w-full">
-                Update Admin
+                Perbarui Admin
               </Button>
             </form>
           </DialogContent>

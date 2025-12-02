@@ -143,8 +143,8 @@ export default function Employees() {
       );
 
       toast({
-        title: "Employee Added",
-        description: `${formData.name} has been added successfully.`,
+        title: "Karyawan Ditambahkan",
+        description: `${formData.name} berhasil ditambahkan.`,
       });
       setIsAddOpen(false);
       setFormData({ employeeId: "", name: "", division: "" });
@@ -153,7 +153,7 @@ export default function Employees() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add employee.",
+        description: "Gagal menambahkan karyawan.",
       });
     }
   };
@@ -199,8 +199,8 @@ export default function Employees() {
       );
 
       toast({
-        title: "Employee Updated",
-        description: "Employee details have been updated successfully.",
+        title: "Karyawan Diperbarui",
+        description: "Data karyawan berhasil diperbarui.",
       });
       setIsEditOpen(false);
       setFormData({ employeeId: "", name: "", division: "" });
@@ -210,18 +210,18 @@ export default function Employees() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update employee.",
+        description: "Gagal memperbarui karyawan.",
       });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this employee?")) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus karyawan ini?")) return;
     try {
       await deleteDoc(doc(db, "employees", id));
       toast({
-        title: "Deleted",
-        description: "Employee removed successfully.",
+        title: "Dihapus",
+        description: "Karyawan berhasil dihapus.",
       });
       fetchEmployees();
     } catch (error) {
@@ -263,21 +263,21 @@ export default function Employees() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Employees
+            Karyawan
           </h1>
           <p className="text-gray-500 mt-2">
-            Manage employee records and generate QR codes.
+            Kelola data karyawan dan generate QR code.
           </p>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
-              <Plus className="h-4 w-4" /> Add Employee
+              <Plus className="h-4 w-4" /> Tambah Karyawan
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
+              <DialogTitle>Tambah Karyawan Baru</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddEmployee} className="space-y-4 mt-4">
               <div className="space-y-2">
@@ -292,14 +292,14 @@ export default function Employees() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Full Name</Label>
+                <Label>Nama Lengkap</Label>
                 <Input
                   required
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="John Doe"
+                  placeholder="Budi Santoso"
                 />
               </div>
               <div className="space-y-2">
@@ -312,7 +312,7 @@ export default function Employees() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select division" />
+                    <SelectValue placeholder="Pilih divisi" />
                   </SelectTrigger>
                   <SelectContent>
                     {DIVISIONS.map((div) => (
@@ -324,7 +324,7 @@ export default function Employees() {
                 </Select>
               </div>
               <DialogFooter>
-                <Button type="submit">Save Employee</Button>
+                <Button type="submit">Simpan Karyawan</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -334,7 +334,7 @@ export default function Employees() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Employee</DialogTitle>
+            <DialogTitle>Ubah Karyawan</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpdateEmployee} className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -345,7 +345,7 @@ export default function Employees() {
                 className="bg-gray-100"
               />
               <p className="text-xs text-gray-500">
-                Employee ID cannot be changed.
+                ID Karyawan tidak dapat diubah.
               </p>
             </div>
             <div className="space-y-2">
@@ -368,7 +368,7 @@ export default function Employees() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select division" />
+                  <SelectValue placeholder="Pilih divisi" />
                 </SelectTrigger>
                 <SelectContent>
                   {DIVISIONS.map((div) => (
@@ -380,7 +380,7 @@ export default function Employees() {
               </Select>
             </div>
             <DialogFooter>
-              <Button type="submit">Update Employee</Button>
+              <Button type="submit">Perbarui Karyawan</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -391,7 +391,7 @@ export default function Employees() {
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
             <Input
-              placeholder="Search by name, employee ID, or division..."
+              placeholder="Cari berdasarkan nama, ID karyawan, atau divisi..."
               className="pl-8 max-w-md"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -403,9 +403,9 @@ export default function Employees() {
             <TableHeader>
               <TableRow>
                 <TableHead>Employee ID</TableHead>
-                <TableHead>Name</TableHead>
+                <TableHead>Nama</TableHead>
                 <TableHead>Division</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -415,7 +415,7 @@ export default function Employees() {
                     colSpan={4}
                     className="text-center py-8 text-gray-500"
                   >
-                    Loading employees...
+                    Loading karyawan...
                   </TableCell>
                 </TableRow>
               ) : filteredEmployees.length === 0 ? (
@@ -424,7 +424,7 @@ export default function Employees() {
                     colSpan={4}
                     className="text-center py-8 text-gray-500"
                   >
-                    No employees found. Add one to get started.
+                    Tidak ada karyawan ditemukan. Tambahkan untuk memulai.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -449,7 +449,7 @@ export default function Employees() {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
-                            <DialogTitle>Employee QR Code</DialogTitle>
+                            <DialogTitle>QR Code Karyawan</DialogTitle>
                           </DialogHeader>
                           <div className="flex flex-col items-center justify-center p-6 space-y-4">
                             <div className="bg-white p-4 rounded-xl border shadow-sm">
@@ -476,7 +476,7 @@ export default function Employees() {
                               className="w-full gap-2"
                               onClick={downloadQR}
                             >
-                              <Download className="h-4 w-4" /> Download QR
+                              <Download className="h-4 w-4" /> Unduh QR
                             </Button>
                           </div>
                         </DialogContent>
