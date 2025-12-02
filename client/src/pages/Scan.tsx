@@ -1,15 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  CheckCircle2,
-  AlertTriangle,
-  RefreshCcw,
-  Loader2,
-  Clock,
-} from "lucide-react";
+import { CheckCircle2, AlertTriangle, RefreshCcw, Loader2 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
@@ -311,31 +304,53 @@ export default function Scan() {
         },
       });
 
+      // Get current time for display
+      const displayTime = new Date().toLocaleTimeString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      // Show detailed success toast
       toast({
         title:
           attendanceType === "check-in"
-            ? "Check In Berhasil"
-            : "Check Out Berhasil",
-        description: successMessage,
+            ? "✅ Absen Masuk Berhasil"
+            : "✅ Absen Pulang Berhasil",
+        description: `${data.name} - ${data.division}\n${displayTime} WIB`,
+        duration: 3000,
       });
+
+      // Auto-reset to scanning mode after 2 seconds
+      setTimeout(() => {
+        resetScan();
+      }, 2000);
     } catch (error: any) {
       console.error("Scan error", error);
       let errorMessage = "Could not recognize employee QR code.";
 
       if (error.code === 1) {
         // PERMISSION_DENIED
-        errorMessage =
-          "Location permission denied. Please enable location services.";
+        errorMessage = "Izin lokasi ditolak. Mohon aktifkan layanan lokasi.";
       } else if (error.message) {
         errorMessage = error.message;
       }
 
       setScanResult({ error: errorMessage });
+
+      // Show error toast
       toast({
         variant: "destructive",
-        title: "Scan Gagal",
+        title: "❌ Scan Gagal",
         description: errorMessage,
+        duration: 4000,
       });
+
+      // Auto-reset to scanning mode after 3 seconds
+      setTimeout(() => {
+        resetScan();
+      }, 3000);
     } finally {
       setProcessing(false);
     }
@@ -351,114 +366,124 @@ export default function Scan() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+    <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header - Compact for mobile */}
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
           Scan Absensi
         </h1>
-        <p className="text-gray-500 mt-2">
-          Letakkan kode QR di dalam frame untuk absen masuk/pulang.
+        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">
+          Arahkan QR code ke kamera
         </p>
       </div>
 
       <Card className="overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-xl">
         <CardContent className="p-0">
           {isScanning ? (
-            <div className="bg-black relative min-h-[400px] flex flex-col items-center justify-center text-white p-4">
+            <div className="bg-black relative min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center text-white p-3 md:p-4">
               <div
                 id="reader"
                 className="w-full rounded-lg overflow-hidden"
               ></div>
-              <p className="text-sm text-gray-400 mt-4 text-center">
-                Pastikan pencahayaan yang baik untuk hasil terbaik
+              <p className="text-xs md:text-sm text-gray-400 mt-3 text-center">
+                💡 Pastikan pencahayaan cukup
               </p>
             </div>
           ) : (
-            <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center space-y-6 bg-gray-50/50">
+            <div className="min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center p-4 md:p-8 text-center space-y-4 md:space-y-6 bg-linear-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-900/50 dark:to-gray-800/30">
               {processing ? (
-                <div className="flex flex-col items-center gap-4">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-lg font-medium text-gray-600">
-                    Memproses absensi...
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-primary" />
+                  <p className="text-base md:text-lg font-medium text-gray-600 dark:text-gray-300">
+                    Memproses...
                   </p>
                 </div>
               ) : scanResult?.error ? (
                 <>
-                  <div className="h-20 w-20 rounded-full bg-red-100 flex items-center justify-center text-red-600 mb-2">
-                    <AlertTriangle className="h-10 w-10" />
+                  <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 animate-in zoom-in duration-300">
+                    <AlertTriangle className="h-8 w-8 md:h-10 md:w-10" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      Scan Gagal
+                  <div className="space-y-1 px-2">
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+                      Gagal
                     </h2>
-                    <p className="text-gray-500 mt-1">{scanResult.error}</p>
+                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 max-w-sm">
+                      {scanResult.error}
+                    </p>
                   </div>
-                  <Button onClick={resetScan} size="lg" className="mt-4">
+                  <Button onClick={resetScan} size="lg" className="mt-2">
                     <RefreshCcw className="mr-2 h-4 w-4" /> Coba Lagi
                   </Button>
                 </>
               ) : (
                 <>
-                  <div className="h-20 w-20 rounded-full bg-green-100 flex items-center justify-center text-green-600 mb-2 animate-in zoom-in duration-300">
-                    <CheckCircle2 className="h-10 w-10" />
+                  <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 animate-in zoom-in duration-300">
+                    <CheckCircle2 className="h-8 w-8 md:h-10 md:w-10" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
+
+                  {/* Success Message - Compact */}
+                  <div className="space-y-1 px-2">
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                       {scanResult?.type === "check-out"
-                        ? "Absen Pulang Berhasil!"
-                        : "Absen Masuk Berhasil!"}
+                        ? "✅ Absen Pulang"
+                        : "✅ Absen Masuk"}
                     </h2>
-                    <p className="text-gray-500 mt-1">
-                      {scanResult?.type === "check-out"
-                        ? "Selamat Jalan!"
-                        : "Selamat Datang!"}
-                      {" Tercatat pada "}
+                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400">
                       {new Date().toLocaleTimeString("id-ID", {
                         timeZone: "Asia/Jakarta",
                         hour: "2-digit",
                         minute: "2-digit",
-                        second: "2-digit",
                         hour12: false,
-                      })}
+                      })}{" "}
+                      WIB
                     </p>
                   </div>
 
-                  <Card className="w-full max-w-xs border-dashed bg-white">
-                    <CardContent className="p-4 text-left space-y-2">
-                      <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold">
+                  {/* Info Card - Compact & Clean */}
+                  <Card className="w-full max-w-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                    <CardContent className="p-3 md:p-4 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                           Nama
                         </span>
-                        <p className="font-medium">{scanResult?.name}</p>
+                        <p className="font-semibold text-sm md:text-base text-gray-900 dark:text-white">
+                          {scanResult?.name}
+                        </p>
                       </div>
-                      <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold">
+                      <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                           Divisi
                         </span>
-                        <p className="text-sm">{scanResult?.division}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold">
-                          ID Peserta
-                        </span>
-                        <p className="font-mono text-xs text-gray-600">
-                          {scanResult?.id}
+                        <p className="text-sm md:text-base text-gray-700 dark:text-gray-300">
+                          {scanResult?.division}
                         </p>
                       </div>
-                      <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold">
-                          Tipe
+                      <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          Status
                         </span>
-                        <p className="font-medium">
+                        <span
+                          className={`text-xs md:text-sm font-semibold px-2.5 py-1 rounded-full ${
+                            scanResult?.type === "check-out"
+                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          }`}
+                        >
                           {scanResult?.type === "check-out"
-                            ? "Absen Pulang"
-                            : "Absen Masuk"}
-                        </p>
+                            ? "Pulang"
+                            : "Masuk"}
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Button onClick={resetScan} size="lg" className="mt-4">
+                  <Button
+                    onClick={resetScan}
+                    size="lg"
+                    className="mt-2 w-full max-w-sm"
+                  >
                     <RefreshCcw className="mr-2 h-4 w-4" /> Scan Berikutnya
                   </Button>
                 </>
