@@ -13,9 +13,12 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/components/theme-provider";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -33,6 +36,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
   const { toast } = useToast();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     // Check if auth is available
@@ -169,26 +173,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         `}
       >
         <div
-          className={`h-16 flex items-center ${
-            isCollapsed ? "justify-center" : "px-6"
+          className={`h-16 flex items-center justify-between ${
+            isCollapsed ? "px-2" : "px-6"
           } border-b border-gray-200 dark:border-gray-700 transition-all duration-300`}
         >
-          <div className="flex items-center gap-2 font-bold text-xl text-primary overflow-hidden whitespace-nowrap">
-            <img src="/logo.png" alt="Logo" className="h-8 w-8 shrink-0" />
-            <span
-              className={`transition-opacity duration-300 ${
-                isCollapsed ? "opacity-0 w-0" : "opacity-100"
-              }`}
-            >
-              AttendanceQR
-            </span>
+          <div className="flex items-center overflow-hidden">
+            <img
+              src="/header.webp"
+              alt="HR Group Attendance"
+              className={`transition-all duration-300 ${
+                isCollapsed ? "h-10" : "h-12"
+              } object-contain`}
+            />
           </div>
-          <button
-            className="ml-auto lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Dark Mode Toggle */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="h-9 w-9"
+                  >
+                    {theme === "dark" ? (
+                      <Sun className="h-4 w-4" />
+                    ) : (
+                      <Moon className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* Mobile Close Button */}
+            <button className="lg:hidden" onClick={() => setSidebarOpen(false)}>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
