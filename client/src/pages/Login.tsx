@@ -174,7 +174,7 @@ export default function Login() {
             HRGroup Management
           </h1>
           <p className="text-sm sm:text-base md:text-lg opacity-90">
-            Memberdayakan Sumber Daya Manusia
+            Rumah Hunian Nyaman
           </p>
         </div>
       </div>
