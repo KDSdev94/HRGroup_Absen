@@ -58,22 +58,19 @@ export default function Login() {
     console.log("Attempting to send reset email to:", resetEmail);
     setIsResetting(true);
     try {
-      // Configure action code settings to redirect back to login page
-      const actionCodeSettings = {
-        url: window.location.origin + "/login", // Redirect to login page after reset
-        handleCodeInApp: false, // Handle in email link, not in app
-      };
-
-      await sendPasswordResetEmail(auth, resetEmail, actionCodeSettings);
+      // Send password reset email
+      // Note: Firebase will use the authorized domains configured in Firebase Console
+      // Make sure to add your deployment domain in Firebase Console > Authentication > Settings > Authorized domains
+      await sendPasswordResetEmail(auth, resetEmail);
       console.log("Reset email sent successfully");
       toast({
         title: "Cek email Anda",
         description:
-          "Jika akun ada, link reset password telah dikirim. Cek juga folder spam Anda.",
+          "Link reset password telah dikirim ke email Anda. Cek juga folder spam.",
         duration: 5000,
       });
       setResetEmail("");
-      // Keep dialog open so user stays on login page
+      setShowForgotDialog(false); // Close dialog after successful send
     } catch (error: any) {
       console.error("Error sending reset email:", error);
       let errorMessage = "Gagal mengirim email reset.";
