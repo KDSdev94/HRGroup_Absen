@@ -26,12 +26,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check if auth is available
+    if (!auth) {
+      console.error("❌ Firebase Auth is not initialized. Check your .env.local file.");
+      if (location !== "/login" && location !== "/register") {
+        setLocation("/login");
+      }
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser && location !== "/login" && location !== "/register") {
         setLocation("/login");
       } else {
         setUser(currentUser);
-        if (currentUser) {
+        if (currentUser && db) {
           // Fetch user role
           try {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -98,7 +107,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       icon: QrCode,
       label: "Scan Attendance",
       href: "/scan",
-      roles: ["superadmin", "admin", "employee"],
+      roles: ["employee"],
     },
     {
       icon: History,
@@ -111,6 +120,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       label: "Reports",
       href: "/reports",
       roles: ["superadmin", "admin"],
+    },
+    {
+      icon: UserCircle,
+      label: "My Profile",
+      href: "/profile",
+      roles: ["employee"],
     },
     // Add more employee specific routes here if needed
   ];

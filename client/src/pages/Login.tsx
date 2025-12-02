@@ -1,37 +1,92 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
+} from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showForgotDialog, setShowForgotDialog] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+
+  // SLIDER GAMBAR - Using hero images from public folder
+  const images = ["/onboard.avif", "/onboard1.avif", "/onboard2.avif"];
+  const [currentImage, setCurrentImage] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImage((prev) => (prev + 1) % images.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter your email address.",
+      });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast({
+        title: "Email Sent",
+        description: "Password reset link has been sent to your email.",
+      });
+      setShowForgotDialog(false);
+      setResetEmail("");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to send reset email.",
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // LOGIN EMAIL + PASSWORD
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: "Success",
-        description: "Welcome back!",
-      });
+
+      if (remember) localStorage.setItem("remember", email);
+      else localStorage.removeItem("remember");
+
+      toast({ title: "Success", description: "Welcome back!" });
       setLocation("/");
     } catch (error: any) {
       toast({
@@ -44,81 +99,221 @@ export default function Login() {
     }
   };
 
+  const handleGoogle = async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+      toast({ title: "Success", description: "Logged in with Google!" });
+      setLocation("/");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Google Login Failed",
+        description: error.message,
+      });
+    }
+  };
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <img src="/logo.png" alt="HRGroup Logo" className="h-12 w-12" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            HRGroup Magang
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* TOP LEFT HEADER IMAGE */}
+      <div className="absolute top-3 left-3 z-50">
+        <img
+          src="/header.webp"
+          alt="HRGroup Header"
+          className="h-10 md:h-12 w-auto object-contain"
+        />
+      </div>
+
+      {/* TOP RIGHT REGISTER BUTTON */}
+      <div className="absolute top-4 right-4 z-50">
+        <a
+          href="/register"
+          className="px-5 py-1.5 bg-black text-white rounded-full text-xs md:text-sm"
+        >
+          Login
+        </a>
+      </div>
+
+      {/* LEFT SIDE SLIDER — MOBILE = ATAS */}
+      <div
+        className="
+        w-full 
+        h-[220px] sm:h-[280px] md:h-[340px]
+        lg:h-screen lg:w-[55%]
+        relative overflow-hidden
+      "
+      >
+        <img
+          key={currentImage}
+          src={images[currentImage]}
+          className="w-full h-full object-cover transition-opacity duration-700"
+        />
+
+        <div className="absolute bottom-4 left-4 lg:bottom-12 lg:left-14 text-white">
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2">
+            HRGroup Management
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            HR Group Management System
+          <p className="text-sm sm:text-base md:text-lg opacity-90">
+            Empowering Human Resources
           </p>
         </div>
+      </div>
 
-        <Card className="border-gray-200 dark:border-gray-800 shadow-lg">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Sign in to your account</CardTitle>
-            <CardDescription>
-              Enter your credentials to access the admin dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Input Your Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-white dark:bg-gray-950"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  placeholder="Input Your Password"
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="bg-white dark:bg-gray-950"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full font-medium"
-                disabled={isLoading}
+      {/* RIGHT SIDE FORM — MOBILE = BAWAH */}
+      <div
+        className="
+        w-full 
+        lg:w-[45%] 
+        h-auto 
+        lg:h-screen 
+        flex items-center justify-center 
+        px-5 
+        py-10
+      "
+      >
+        <div className="w-full max-w-md">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] mb-1">
+            Welcome Back!
+          </h1>
+          <p className="text-gray-500 mb-8 md:mb-10">
+            Sign in to your HRGroup account
+          </p>
+
+          {/* FORM */}
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* EMAIL */}
+            <div className="space-y-2">
+              <Label>Email Address</Label>
+              <Input
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12"
+              />
+            </div>
+
+            {/* PASSWORD */}
+            <div className="space-y-2 relative">
+              <Label>Password</Label>
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-12 pr-10"
+              />
+
+              {/* SHOW / HIDE PASSWORD */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-[38px] text-gray-600"
               >
-                {isLoading ? (
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
+            {/* REMEMBER ME & FORGOT PASSWORD */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600">Remember Me</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForgotDialog(true)}
+                className="text-sm text-blue-600 hover:underline font-medium"
+              >
+                Forgot Password?
+              </button>
+            </div>
+
+            {/* LOGIN BUTTON */}
+            <Button
+              disabled={isLoading}
+              type="submit"
+              className="w-full h-12 text-md font-medium"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+                </>
+              ) : (
+                "Login"
+              )}
+            </Button>
+          </form>
+
+          {/* INSTANT LOGIN */}
+          <div className="my-4 flex items-center justify-center text-gray-500 text-sm">
+            <span className="px-4">Instant Login</span>
+          </div>
+
+          <Button
+            onClick={handleGoogle}
+            className="w-full h-12 bg-white border text-black hover:bg-gray-100"
+          >
+            <img src="/google.png" alt="g" className="h-5 mr-2" />
+            Continue with Google
+          </Button>
+
+          <div className="mt-6 text-center text-sm">
+            Don't have an account?{" "}
+            <a href="/register" className="text-blue-600 hover:underline">
+              Register
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* FORGOT PASSWORD DIALOG */}
+      <Dialog open={showForgotDialog} onOpenChange={setShowForgotDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you a link to reset your
+              password.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email Address</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                placeholder="Enter your email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowForgotDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isResetting}>
+                {isResetting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
                   </>
                 ) : (
-                  "Sign In"
+                  "Send Reset Link"
                 )}
               </Button>
-            </form>
-            <div className="mt-4 text-center text-sm">
-              <span className="text-gray-500">Don't have an account? </span>
-              <a
-                href="/register"
-                className="text-primary hover:underline font-medium"
-              >
-                Register
-              </a>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

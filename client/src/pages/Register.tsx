@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -11,13 +15,6 @@ import {
 } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -27,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -39,14 +36,16 @@ interface Employee {
 }
 
 export default function Register() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedDivision, setSelectedDivision] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
 
   const DIVISIONS = [
     "Akuntansi & Keuangan",
@@ -60,6 +59,17 @@ export default function Register() {
     "Marketing",
   ];
 
+  const images = ["/onboard.avif", "/onboard1.avif", "/onboard2.avif"];
+  const [currentImage, setCurrentImage] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImage((prev) => (prev + 1) % images.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // FETCH EMPLOYEE LIST
   useEffect(() => {
     fetchEmployees();
   }, []);
@@ -71,7 +81,6 @@ export default function Register() {
         id: doc.id,
         ...doc.data(),
       })) as Employee[];
-      // Filter out already registered employees (those with uid or email)
       const unregisteredEmployees = employeesData.filter(
         (emp) => !emp.uid && !emp.email
       );
@@ -87,6 +96,7 @@ export default function Register() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedEmployeeId || !email || !password) {
       toast({
         variant: "destructive",
@@ -99,7 +109,7 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // 1. Create user in Firebase Auth
+      // 1. Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -107,165 +117,258 @@ export default function Register() {
       );
       const user = userCredential.user;
 
-      // 2. Create User Profile with Role
+      // 2. Create User Profile
       await setDoc(doc(db, "users", user.uid), {
-        email: email,
+        email,
         role: "employee",
-        employeeId: selectedEmployeeId, // Link to employee document ID
+        employeeId: selectedEmployeeId,
         createdAt: new Date().toISOString(),
       });
 
-      // 3. Update Employee document with uid and email
+      // 3. Update employee doc to include all necessary fields
       const employeeRef = doc(db, "employees", selectedEmployeeId);
       await updateDoc(employeeRef, {
         uid: user.uid,
-        email: email,
+        email,
+        lastLogin: new Date().toISOString(),
+        isActive: true,
       });
 
       toast({
         title: "Success",
         description: "Account created successfully!",
       });
-      setLocation("/");
+      setLocation("/login");
     } catch (error: any) {
-      console.error("Registration error:", error);
       toast({
         variant: "destructive",
-        title: "Registration Failed",
-        description: error.message || "Failed to create account.",
+        title: "Registration failed",
+        description: error.message,
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  // REGISTER WITH GOOGLE
+  const handleGoogleRegister = async () => {
+    try {
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      const user = result.user;
+
+      // For Google registration, we might need to handle employee selection differently
+      // For now, we'll prompt the user to select their employee profile
+      toast({
+        title: "Success",
+        description:
+          "Successfully authenticated with Google. Please complete your registration.",
+      });
+
+      // We could redirect to a profile completion page or handle differently
+      // For now, keeping them on the register page to select employee
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Google Registration Failed",
+        description: error.message,
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <img src="/logo.png" alt="HRGroup Logo" className="h-12 w-12" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            HRGroup Magang
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* TOP LEFT HEADER IMAGE */}
+      <div className="absolute top-3 left-3 z-50">
+        <img
+          src="/header.webp"
+          alt="HRGroup Header"
+          className="h-10 w-auto md:h-12 object-contain"
+        />
+      </div>
+
+      {/* TOP RIGHT LOGIN BUTTON */}
+      <div className="absolute top-4 right-4 z-50">
+        <a
+          href="/login"
+          className="px-5 py-1.5 bg-black text-white rounded-full text-xs md:text-sm"
+        >
+          Register
+        </a>
+      </div>
+
+      {/* LEFT SIDE SLIDER (MOBILE = ATAS) */}
+      <div
+        className="
+      w-full 
+      h-[220px] 
+      sm:h-[280px] 
+      md:h-[340px]
+      lg:h-screen lg:w-[55%]
+      relative overflow-hidden
+    "
+      >
+        <img
+          key={currentImage}
+          src={images[currentImage]}
+          className="w-full h-full object-cover transition-opacity duration-700"
+        />
+
+        <div className="absolute bottom-4 left-4 lg:bottom-12 lg:left-14 text-white">
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2">
+            HRGroup Management
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            Employee Registration
+          <p className="text-sm sm:text-base md:text-lg opacity-90">
+            Employee Registration Portal
           </p>
         </div>
+      </div>
 
-        <Card className="border-gray-200 dark:border-gray-800 shadow-lg">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Create your account</CardTitle>
-            <CardDescription>
-              Link your profile and set up your credentials
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Division</Label>
-                <Select
-                  value={selectedDivision}
-                  onValueChange={(value) => {
-                    setSelectedDivision(value);
-                    setSelectedEmployeeId(""); // Reset selected employee when division changes
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your division" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DIVISIONS.map((div) => (
-                      <SelectItem key={div} value={div}>
-                        {div}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      {/* RIGHT SIDE FORM (MOBILE = BAWAH) */}
+      <div
+        className="
+      w-full 
+      lg:w-[45%] 
+      h-auto 
+      lg:h-screen 
+      flex 
+      items-center 
+      justify-center 
+      px-5 
+      py-10
+    "
+      >
+        <div className="w-full max-w-md">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] mb-1">
+            Create Account
+          </h1>
 
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Select
-                  value={selectedEmployeeId}
-                  onValueChange={setSelectedEmployeeId}
-                  disabled={!selectedDivision}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        selectedDivision
-                          ? "Select your name"
-                          : "Select division first"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredEmployees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedDivision && filteredEmployees.length === 0 && (
-                  <p className="text-xs text-amber-600">
-                    No unregistered employees found in this division.
-                  </p>
-                )}
-              </div>
+          <p className="text-gray-500 mb-8 md:mb-10">
+            Register your HRGroup employee access
+          </p>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Input Your Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-white dark:bg-gray-950"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  placeholder="Input Your Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="bg-white dark:bg-gray-950"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full font-medium"
-                disabled={isLoading || !selectedEmployeeId}
+          <form onSubmit={handleRegister} className="space-y-6">
+            {/* DIVISION */}
+            <div className="space-y-2">
+              <Label>Division</Label>
+              <Select
+                value={selectedDivision}
+                onValueChange={(value) => {
+                  setSelectedDivision(value);
+                  setSelectedEmployeeId("");
+                }}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  "Register"
-                )}
-              </Button>
-              <div className="text-center text-sm">
-                <span className="text-gray-500">Already have an account? </span>
-                <a
-                  href="/login"
-                  className="text-primary hover:underline font-medium"
-                >
-                  Sign in
-                </a>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select division" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DIVISIONS.map((div) => (
+                    <SelectItem key={div} value={div}>
+                      {div}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* NAME */}
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={setSelectedEmployeeId}
+                disabled={!selectedDivision}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue
+                    placeholder={
+                      selectedDivision ? "Select name" : "Select division first"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredEmployees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedDivision && filteredEmployees.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  No unregistered employees in this division.
+                </p>
+              )}
+            </div>
+
+            {/* EMAIL */}
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12"
+              />
+            </div>
+
+            {/* PASSWORD */}
+            <div className="space-y-2 relative">
+              <Label>Password</Label>
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-12 pr-10"
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-[38px] text-gray-600"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
+            {/* REGISTER BUTTON */}
+            <Button
+              disabled={isLoading || !selectedEmployeeId}
+              type="submit"
+              className="w-full h-12 text-md font-medium"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…
+                </>
+              ) : (
+                "Register"
+              )}
+            </Button>
+
+            {/* GOOGLE REGISTER */}
+            <div className="my-4 flex items-center justify-center text-gray-500 text-sm">
+              <span className="px-4">Instant Registration</span>
+            </div>
+
+            <Button
+              onClick={handleGoogleRegister}
+              className="w-full h-12 bg-white border text-black hover:bg-gray-100"
+            >
+              <img src="/google.png" alt="g" className="h-5 mr-2" />
+              Continue with Google
+            </Button>
+
+            <div className="mt-4 text-center text-sm">
+              Already have an account?{" "}
+              <a href="/login" className="text-blue-600 hover:underline">
+                Login
+              </a>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

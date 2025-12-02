@@ -25,8 +25,16 @@ import {
 } from "@/components/ui/dialog";
 import { MapPin, Calendar, Clock, Eye } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
 interface AttendanceRecord {
@@ -34,11 +42,12 @@ interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
   date: string;
-  timestamp: string;
+  timestamp: any; // Can be Firestore Timestamp or string
   type: string;
   location?: {
     latitude: number;
     longitude: number;
+    address?: string; // Add address field
   };
 }
 
@@ -49,11 +58,53 @@ export default function AttendanceHistory() {
     null
   );
   const [filterDate, setFilterDate] = useState("");
+  const [locationAddresses, setLocationAddresses] = useState<
+    Record<string, string>
+  >({});
+  const [recordAddresses, setRecordAddresses] = useState<
+    Record<string, string>
+  >({});
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchAttendanceHistory();
+    // Wait for auth state to be ready
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        fetchAttendanceHistory();
+      } else {
+        setLoading(false);
+        toast({
+          title: "Error",
+          description: "Please log in to view attendance history",
+          variant: "destructive",
+        });
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  // Fetch addresses for all records
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      for (const record of records) {
+        if (record.location && !recordAddresses[record.id]) {
+          const address = await getAddressFromCoordinates(
+            record.location.latitude,
+            record.location.longitude
+          );
+          setRecordAddresses((prev) => ({
+            ...prev,
+            [record.id]: address,
+          }));
+        }
+      }
+    };
+
+    if (records.length > 0) {
+      fetchAddresses();
+    }
+  }, [records]);
 
   const fetchAttendanceHistory = async () => {
     try {
@@ -69,21 +120,44 @@ export default function AttendanceHistory() {
         return;
       }
 
-      // Get user's employeeId from users collection
+      // Try to get the employeeId from multiple sources
       let employeeId: string | null = null;
 
+      console.log(
+        "🔍 Looking for employee ID for user:",
+        currentUser.uid,
+        currentUser.email
+      );
+
+      // 1. Try to get employeeId from the users collection
       try {
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
         if (userDoc.exists()) {
-          employeeId = userDoc.data().employeeId;
+          const userData = userDoc.data();
+          employeeId = userData.employeeId || userDoc.id; // fallback to doc ID
+          console.log("✅ Found employeeId in users collection:", employeeId);
         }
       } catch (error) {
-        console.log(
-          "User profile not found in users collection, trying employees..."
-        );
+        console.log("User profile not found in users collection:", error);
       }
 
-      // If no employeeId found, try to find by UID in employees collection
+      // 2. If not found in users, try to find employee document with matching UID
+      if (!employeeId) {
+        try {
+          const empDoc = await getDoc(doc(db, "employees", currentUser.uid));
+          if (empDoc.exists()) {
+            employeeId = empDoc.id; // Use document ID as employeeId
+            console.log(
+              "✅ Found employeeId in employees collection (by UID as doc ID):",
+              employeeId
+            );
+          }
+        } catch (error) {
+          console.log("Employee doc not found in employees collection:", error);
+        }
+      }
+
+      // 3. If still not found, query employees collection where uid matches
       if (!employeeId) {
         try {
           const empQuery = query(
@@ -93,14 +167,33 @@ export default function AttendanceHistory() {
           const empSnapshot = await getDocs(empQuery);
           if (!empSnapshot.empty) {
             employeeId = empSnapshot.docs[0].id;
+            console.log("✅ Found employeeId by UID field query:", employeeId);
           }
         } catch (error) {
-          console.log("No employee found by UID");
+          console.log("No employee found by UID query:", error);
+        }
+      }
+
+      // 4. If still no employeeId, try to get it from employee's document fields
+      if (!employeeId) {
+        try {
+          const empQuery = query(
+            collection(db, "employees"),
+            where("email", "==", currentUser.email)
+          );
+          const empSnapshot = await getDocs(empQuery);
+          if (!empSnapshot.empty) {
+            employeeId = empSnapshot.docs[0].id;
+            console.log("✅ Found employeeId by email query:", employeeId);
+          }
+        } catch (error) {
+          console.log("No employee found by email query:", error);
         }
       }
 
       // If still no employeeId, show error
       if (!employeeId) {
+        console.log("❌ No employeeId found for user");
         toast({
           title: "Error",
           description:
@@ -110,11 +203,14 @@ export default function AttendanceHistory() {
         return;
       }
 
+      console.log("📋 Querying attendance for employeeId:", employeeId);
+
       // Query attendance records for this employee
+      // Note: Removed orderBy to avoid needing a composite index
+      // We'll sort on the client side instead
       const q = query(
         collection(db, "attendance"),
-        where("employeeId", "==", employeeId),
-        orderBy("timestamp", "desc")
+        where("employeeId", "==", employeeId)
       );
 
       const querySnapshot = await getDocs(q);
@@ -122,6 +218,18 @@ export default function AttendanceHistory() {
         id: doc.id,
         ...doc.data(),
       })) as AttendanceRecord[];
+
+      console.log(`✅ Found ${attendanceData.length} attendance records`);
+      if (attendanceData.length > 0) {
+        console.log("Sample record:", attendanceData[0]);
+      }
+
+      // Sort by timestamp descending on client side
+      attendanceData.sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        return timeB - timeA; // descending order (newest first)
+      });
 
       setRecords(attendanceData);
     } catch (error) {
@@ -156,13 +264,88 @@ export default function AttendanceHistory() {
     });
   };
 
-  const formatTime = (timestampString: string) => {
-    const date = new Date(timestampString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+  const formatTime = (timestamp: any) => {
+    try {
+      let date: Date;
+
+      // Handle Firestore Timestamp object
+      if (timestamp?.toDate && typeof timestamp.toDate === "function") {
+        date = timestamp.toDate();
+      }
+      // Handle timestamp with seconds property (Firestore format)
+      else if (timestamp?.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      // Handle ISO string or regular date string
+      else if (typeof timestamp === "string") {
+        date = new Date(timestamp);
+      }
+      // Handle number (milliseconds)
+      else if (typeof timestamp === "number") {
+        date = new Date(timestamp);
+      }
+      // Handle Date object
+      else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        console.error("Unknown timestamp format:", timestamp);
+        return "Invalid time";
+      }
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date created from timestamp:", timestamp);
+        return "Invalid time";
+      }
+
+      // Format with WIB timezone (Asia/Jakarta)
+      return date.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+        hour12: false,
+      });
+    } catch (error) {
+      console.error("Error formatting time:", error, "Timestamp:", timestamp);
+      return "Invalid time";
+    }
+  };
+
+  // Reverse geocoding to get address from coordinates
+  const getAddressFromCoordinates = async (
+    latitude: number,
+    longitude: number
+  ): Promise<string> => {
+    const key = `${latitude},${longitude}`;
+
+    // Check if we already have this address cached
+    if (locationAddresses[key]) {
+      return locationAddresses[key];
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            "User-Agent": "HRGroup-Attendance-App",
+          },
+        }
+      );
+      const data = await response.json();
+
+      // Extract meaningful address parts
+      const address =
+        data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
+      // Cache the address
+      setLocationAddresses((prev) => ({ ...prev, [key]: address }));
+
+      return address;
+    } catch (error) {
+      console.error("Error getting address:", error);
+      return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+    }
   };
 
   return (
@@ -261,11 +444,14 @@ export default function AttendanceHistory() {
                       </TableCell>
                       <TableCell>
                         {record.location ? (
-                          <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                            <MapPin className="h-4 w-4" />
-                            <span className="text-xs">
-                              {record.location.latitude.toFixed(4)},{" "}
-                              {record.location.longitude.toFixed(4)}
+                          <div className="flex items-center gap-2 max-w-xs">
+                            <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                            <span
+                              className="text-sm text-gray-700 dark:text-gray-300 truncate"
+                              title={recordAddresses[record.id]}
+                            >
+                              {recordAddresses[record.id] ||
+                                "Loading address..."}
                             </span>
                           </div>
                         ) : (

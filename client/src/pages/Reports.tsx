@@ -106,7 +106,13 @@ export default function Reports() {
         Division: row.division || "-",
         Date: row.date,
         Time: row.timestamp
-          ? new Date(row.timestamp.seconds * 1000).toLocaleTimeString()
+          ? new Date(row.timestamp.seconds * 1000).toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              timeZone: "Asia/Jakarta",
+              hour12: false,
+            })
           : "-",
         Type: row.type,
         Location: getLocationStatus(row),
@@ -129,7 +135,13 @@ export default function Reports() {
       row.division || "-",
       row.date,
       row.timestamp
-        ? new Date(row.timestamp.seconds * 1000).toLocaleTimeString()
+        ? new Date(row.timestamp.seconds * 1000).toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZone: "Asia/Jakarta",
+            hour12: false,
+          })
         : "-",
       row.type,
       getLocationStatus(row),
@@ -214,7 +226,13 @@ export default function Reports() {
                         {record.timestamp
                           ? new Date(
                               record.timestamp.seconds * 1000
-                            ).toLocaleTimeString()
+                            ).toLocaleTimeString("id-ID", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              timeZone: "Asia/Jakarta",
+                              hour12: false,
+                            })
                           : "-"}
                       </TableCell>
                       <TableCell>

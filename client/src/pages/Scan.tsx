@@ -3,9 +3,9 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, AlertTriangle, RefreshCcw, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, RefreshCcw, Loader2, Clock } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Scan() {
@@ -86,7 +86,44 @@ export default function Scan() {
 
       const { latitude, longitude } = location.coords;
 
-      setScanResult(data);
+      // Check if employee has already checked in today but not checked out
+      const today = new Date().toISOString().split("T")[0];
+      const checkInQuery = query(
+        collection(db, "attendance"),
+        where("employeeId", "==", data.id),
+        where("date", "==", today),
+        where("type", "==", "check-in")
+      );
+      const checkInSnapshot = await getDocs(checkInQuery);
+
+      // Check if employee has already checked out today
+      const checkOutQuery = query(
+        collection(db, "attendance"),
+        where("employeeId", "==", data.id),
+        where("date", "==", today),
+        where("type", "==", "check-out")
+      );
+      const checkOutSnapshot = await getDocs(checkOutQuery);
+
+      let attendanceType = "check-in";
+      let successMessage = `Welcome, ${data.name}! Location recorded.`;
+
+      // Logic: If they have already checked in but not out, record check-out
+      // If they have already checked out, give an error message
+      if (checkInSnapshot.size > 0 && checkOutSnapshot.size === 0) {
+        // Record check-out
+        attendanceType = "check-out";
+        successMessage = `Goodbye, ${data.name}! Check-out recorded.`;
+      } else if (checkOutSnapshot.size > 0) {
+        // Already checked out today - show error
+        throw new Error("Employee has already checked out today.");
+      }
+
+      // Update scan result to include attendance type
+      setScanResult({
+        ...data,
+        type: attendanceType
+      });
 
       // Log attendance to Firebase with Location
       await addDoc(collection(db, "attendance"), {
@@ -94,8 +131,8 @@ export default function Scan() {
         employeeName: data.name,
         division: data.division,
         timestamp: serverTimestamp(),
-        date: new Date().toISOString().split("T")[0],
-        type: "check-in",
+        date: today,
+        type: attendanceType,
         location: {
           latitude,
           longitude,
@@ -104,7 +141,7 @@ export default function Scan() {
 
       toast({
         title: "Attendance Recorded",
-        description: `Welcome, ${data.name}! Location recorded.`,
+        description: successMessage,
       });
     } catch (error: any) {
       console.error("Scan error", error);
@@ -116,6 +153,8 @@ export default function Scan() {
           "Location permission denied. Please enable location services.";
       } else if (error.message === "Invalid QR Code") {
         errorMessage = "Invalid QR Code format.";
+      } else if (error.message === "Employee has already checked out today.") {
+        errorMessage = "You have already checked out today.";
       }
 
       setScanResult({ error: errorMessage });
@@ -189,10 +228,11 @@ export default function Scan() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">
-                      Check In Successful!
+                      {scanResult?.type === "check-out" ? "Check Out Successful!" : "Check In Successful!"}
                     </h2>
                     <p className="text-gray-500 mt-1">
-                      Recorded at {new Date().toLocaleTimeString()}
+                      {scanResult?.type === "check-out" ? "Goodbye!" : "Welcome!"}
+                      {" Recorded at "}{new Date().toLocaleTimeString()}
                     </p>
                   </div>
 
@@ -216,6 +256,14 @@ export default function Scan() {
                         </span>
                         <p className="font-mono text-xs text-gray-600">
                           {scanResult?.id}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-400 uppercase font-bold">
+                          Type
+                        </span>
+                        <p className="font-medium">
+                          {scanResult?.type === "check-out" ? "Check Out" : "Check In"}
                         </p>
                       </div>
                     </CardContent>
