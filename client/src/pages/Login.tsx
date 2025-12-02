@@ -58,7 +58,13 @@ export default function Login() {
     console.log("Attempting to send reset email to:", resetEmail);
     setIsResetting(true);
     try {
-      await sendPasswordResetEmail(auth, resetEmail);
+      // Configure action code settings to redirect back to login page
+      const actionCodeSettings = {
+        url: window.location.origin + "/login", // Redirect to login page after reset
+        handleCodeInApp: false, // Handle in email link, not in app
+      };
+
+      await sendPasswordResetEmail(auth, resetEmail, actionCodeSettings);
       console.log("Reset email sent successfully");
       toast({
         title: "Cek email Anda",
@@ -66,8 +72,8 @@ export default function Login() {
           "Jika akun ada, link reset password telah dikirim. Cek juga folder spam Anda.",
         duration: 5000,
       });
-      setShowForgotDialog(false);
       setResetEmail("");
+      // Keep dialog open so user stays on login page
     } catch (error: any) {
       console.error("Error sending reset email:", error);
       let errorMessage = "Gagal mengirim email reset.";
@@ -168,7 +174,7 @@ export default function Login() {
             HRGroup Management
           </h1>
           <p className="text-sm sm:text-base md:text-lg opacity-90">
-            Empowering Human Resources
+            Memberdayakan Sumber Daya Manusia
           </p>
         </div>
       </div>
@@ -186,10 +192,10 @@ export default function Login() {
       "
       >
         <div className="w-full max-w-md">
-          <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] mb-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] dark:text-white mb-1">
             Selamat Datang Kembali!
           </h1>
-          <p className="text-gray-500 mb-8 md:mb-10">
+          <p className="text-gray-500 dark:text-gray-300 mb-8 md:mb-10">
             Masuk ke akun HRGroup Anda
           </p>
 
@@ -197,7 +203,7 @@ export default function Login() {
           <form onSubmit={handleLogin} className="space-y-6">
             {/* EMAIL */}
             <div className="space-y-2">
-              <Label>Alamat Email</Label>
+              <Label>Email</Label>
               <Input
                 type="email"
                 placeholder="Masukkan email"

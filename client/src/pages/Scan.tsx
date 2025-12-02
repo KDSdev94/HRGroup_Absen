@@ -321,10 +321,10 @@ export default function Scan() {
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Scan Attendance
+          Scan Absensi
         </h1>
         <p className="text-gray-500 mt-2">
-          Place the QR code within the frame to check in/out.
+          Letakkan kode QR di dalam frame untuk absen masuk/pulang.
         </p>
       </div>
 
@@ -337,7 +337,7 @@ export default function Scan() {
                 className="w-full rounded-lg overflow-hidden"
               ></div>
               <p className="text-sm text-gray-400 mt-4 text-center">
-                Ensure good lighting for best results
+                Pastikan pencahayaan yang baik untuk hasil terbaik
               </p>
             </div>
           ) : (
@@ -346,7 +346,7 @@ export default function Scan() {
                 <div className="flex flex-col items-center gap-4">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
                   <p className="text-lg font-medium text-gray-600">
-                    Processing attendance...
+                    Memproses absensi...
                   </p>
                 </div>
               ) : scanResult?.error ? (
@@ -356,12 +356,12 @@ export default function Scan() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">
-                      Scan Failed
+                      Scan Gagal
                     </h2>
                     <p className="text-gray-500 mt-1">{scanResult.error}</p>
                   </div>
                   <Button onClick={resetScan} size="lg" className="mt-4">
-                    <RefreshCcw className="mr-2 h-4 w-4" /> Try Again
+                    <RefreshCcw className="mr-2 h-4 w-4" /> Coba Lagi
                   </Button>
                 </>
               ) : (
@@ -372,14 +372,14 @@ export default function Scan() {
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">
                       {scanResult?.type === "check-out"
-                        ? "Check Out Successful!"
-                        : "Check In Successful!"}
+                        ? "Absen Pulang Berhasil!"
+                        : "Absen Masuk Berhasil!"}
                     </h2>
                     <p className="text-gray-500 mt-1">
                       {scanResult?.type === "check-out"
-                        ? "Goodbye!"
-                        : "Welcome!"}
-                      {" Recorded at "}
+                        ? "Selamat Jalan!"
+                        : "Selamat Datang!"}
+                      {" Tercatat pada "}
                       {new Date().toLocaleTimeString("id-ID", {
                         timeZone: "Asia/Jakarta",
                         hour: "2-digit",
@@ -394,19 +394,19 @@ export default function Scan() {
                     <CardContent className="p-4 text-left space-y-2">
                       <div>
                         <span className="text-xs text-gray-400 uppercase font-bold">
-                          Name
+                          Nama
                         </span>
                         <p className="font-medium">{scanResult?.name}</p>
                       </div>
                       <div>
                         <span className="text-xs text-gray-400 uppercase font-bold">
-                          Division
+                          Divisi
                         </span>
                         <p className="text-sm">{scanResult?.division}</p>
                       </div>
                       <div>
                         <span className="text-xs text-gray-400 uppercase font-bold">
-                          Employee ID
+                          ID Peserta
                         </span>
                         <p className="font-mono text-xs text-gray-600">
                           {scanResult?.id}
@@ -414,19 +414,19 @@ export default function Scan() {
                       </div>
                       <div>
                         <span className="text-xs text-gray-400 uppercase font-bold">
-                          Type
+                          Tipe
                         </span>
                         <p className="font-medium">
                           {scanResult?.type === "check-out"
-                            ? "Check Out"
-                            : "Check In"}
+                            ? "Absen Pulang"
+                            : "Absen Masuk"}
                         </p>
                       </div>
                     </CardContent>
                   </Card>
 
                   <Button onClick={resetScan} size="lg" className="mt-4">
-                    <RefreshCcw className="mr-2 h-4 w-4" /> Scan Next
+                    <RefreshCcw className="mr-2 h-4 w-4" /> Scan Berikutnya
                   </Button>
                 </>
               )}

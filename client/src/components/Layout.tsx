@@ -102,43 +102,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const allNavItems = [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      label: "Dasbor",
       href: "/",
       roles: ["superadmin", "admin", "employee"],
     },
     {
       icon: Users,
-      label: "Employees",
+      label: "Peserta",
       href: "/employees",
       roles: ["superadmin", "admin"],
     },
     {
       icon: Shield,
-      label: "Admins",
+      label: "Admin",
       href: "/admins",
       roles: ["superadmin"],
     },
     {
       icon: QrCode,
-      label: "Scan Attendance",
+      label: "Scan Absensi",
       href: "/scan",
       roles: ["employee"],
     },
     {
       icon: History,
-      label: "Attendance History",
+      label: "Riwayat Absensi",
       href: "/attendance-history",
       roles: ["employee"],
     },
     {
       icon: FileText,
-      label: "Reports",
+      label: "Laporan",
       href: "/reports",
       roles: ["superadmin", "admin"],
     },
     {
       icon: UserCircle,
-      label: "My Profile",
+      label: "Profil Saya",
       href: "/profile",
       roles: ["employee"],
     },
@@ -175,7 +175,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div
           className={`h-16 flex items-center justify-between ${
             isCollapsed ? "px-2" : "px-6"
-          } border-b border-gray-200 dark:border-gray-700 transition-all duration-300`}
+          } border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white`}
         >
           <div className="flex items-center overflow-hidden">
             <img
@@ -206,7 +206,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                  {theme === "dark" ? "Mode Terang" : "Mode Gelap"}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -310,11 +310,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 shrink-0" />
-                  {!isCollapsed && <span>Log Out</span>}
+                  {!isCollapsed && <span>Keluar</span>}
                 </Button>
               </TooltipTrigger>
               {isCollapsed && (
-                <TooltipContent side="right">Log Out</TooltipContent>
+                <TooltipContent side="right">Keluar</TooltipContent>
               )}
             </Tooltip>
           </TooltipProvider>

@@ -305,7 +305,7 @@ export default function Profile() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500">Loading profile...</p>
+        <p className="text-gray-500">Memuat profil...</p>
       </div>
     );
   }
@@ -314,21 +314,21 @@ export default function Profile() {
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          User Profile
+          Profil Pengguna
         </h1>
         <p className="text-gray-500 mt-2">
-          Manage your personal information and account settings.
+          Kelola informasi pribadi dan pengaturan akun Anda.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
+          <CardTitle>Informasi Pribadi</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">Nama Lengkap</Label>
               <Input
                 id="name"
                 value={userProfile.name}
@@ -354,7 +354,7 @@ export default function Profile() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="employeeId">Employee ID</Label>
+              <Label htmlFor="employeeId">ID Peserta</Label>
               <Input
                 id="employeeId"
                 value={userProfile.employeeId}
@@ -365,7 +365,7 @@ export default function Profile() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="division">Division</Label>
+              <Label htmlFor="division">Divisi</Label>
               <Input
                 id="division"
                 value={userProfile.division}
@@ -378,7 +378,7 @@ export default function Profile() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
+            <Label htmlFor="phone">Nomor Telepon</Label>
             <Input
               id="phone"
               value={userProfile.phone}
@@ -390,7 +390,7 @@ export default function Profile() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
+            <Label htmlFor="address">Alamat</Label>
             <Input
               id="address"
               value={userProfile.address}
@@ -404,7 +404,7 @@ export default function Profile() {
           <div className="flex gap-2 pt-4">
             {editing ? (
               <>
-                <Button onClick={handleSave}>Save Changes</Button>
+                <Button onClick={handleSave}>Simpan Perubahan</Button>
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -412,18 +412,18 @@ export default function Profile() {
                     fetchUserProfile();
                   }}
                 >
-                  Cancel
+                  Batal
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setEditing(true)}>Edit Profile</Button>
+              <Button onClick={() => setEditing(true)}>Edit Profil</Button>
             )}
             <Button
               variant="outline"
               onClick={handleLogout}
               className="ml-auto"
             >
-              Logout
+              Keluar
             </Button>
           </div>
         </CardContent>
@@ -431,28 +431,28 @@ export default function Profile() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Security</CardTitle>
+          <CardTitle>Keamanan</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!showPasswordForm ? (
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">Password</p>
+                <p className="font-medium">Kata Sandi</p>
                 <p className="text-sm text-gray-500">
-                  Change your password securely
+                  Ubah kata sandi Anda dengan aman
                 </p>
               </div>
               <Button
                 variant="outline"
                 onClick={() => setShowPasswordForm(true)}
               >
-                Change Password
+                Ubah Kata Sandi
               </Button>
             </div>
           ) : (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
               <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
+                <Label htmlFor="current-password">Kata Sandi Saat Ini</Label>
                 <Input
                   id="current-password"
                   type="password"
@@ -466,7 +466,7 @@ export default function Profile() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
+                <Label htmlFor="new-password">Kata Sandi Baru</Label>
                 <Input
                   id="new-password"
                   type="password"
@@ -480,7 +480,7 @@ export default function Profile() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Label htmlFor="confirm-password">Konfirmasi Kata Sandi</Label>
                 <Input
                   id="confirm-password"
                   type="password"
@@ -506,13 +506,13 @@ export default function Profile() {
                   }}
                   disabled={passwordLoading}
                 >
-                  Cancel
+                  Batal
                 </Button>
                 <Button
                   onClick={handleChangePassword}
                   disabled={passwordLoading}
                 >
-                  {passwordLoading ? "Updating..." : "Update Password"}
+                  {passwordLoading ? "Memperbarui..." : "Perbarui Kata Sandi"}
                 </Button>
               </div>
             </div>

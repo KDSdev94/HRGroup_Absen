@@ -192,7 +192,7 @@ export default function Register() {
           href="/login"
           className="px-5 py-1.5 bg-black text-white rounded-full text-xs md:text-sm"
         >
-          Register
+          Daftar
         </a>
       </div>
 
@@ -218,7 +218,7 @@ export default function Register() {
             HRGroup Management
           </h1>
           <p className="text-sm sm:text-base md:text-lg opacity-90">
-            Employee Registration Portal
+            Portal Pendaftaran Peserta
           </p>
         </div>
       </div>
@@ -238,18 +238,18 @@ export default function Register() {
     "
       >
         <div className="w-full max-w-md">
-          <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] mb-1">
-            Create Account
+          <h1 className="text-2xl md:text-3xl font-bold text-[#0f1a44] dark:text-white mb-1">
+            Buat Akun
           </h1>
 
-          <p className="text-gray-500 mb-8 md:mb-10">
-            Register your HRGroup employee access
+          <p className="text-gray-500 dark:text-gray-300 mb-8 md:mb-10">
+            Daftarkan akses peserta HRGroup Anda
           </p>
 
           <form onSubmit={handleRegister} className="space-y-6">
             {/* DIVISION */}
             <div className="space-y-2">
-              <Label>Division</Label>
+              <Label>Divisi</Label>
               <Select
                 value={selectedDivision}
                 onValueChange={(value) => {
@@ -258,7 +258,7 @@ export default function Register() {
                 }}
               >
                 <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Select division" />
+                  <SelectValue placeholder="Pilih divisi" />
                 </SelectTrigger>
                 <SelectContent>
                   {DIVISIONS.map((div) => (
@@ -272,7 +272,7 @@ export default function Register() {
 
             {/* NAME */}
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>Nama</Label>
               <Select
                 value={selectedEmployeeId}
                 onValueChange={setSelectedEmployeeId}
@@ -281,7 +281,9 @@ export default function Register() {
                 <SelectTrigger className="h-12">
                   <SelectValue
                     placeholder={
-                      selectedDivision ? "Select name" : "Select division first"
+                      selectedDivision
+                        ? "Pilih nama"
+                        : "Pilih divisi terlebih dahulu"
                     }
                   />
                 </SelectTrigger>
@@ -296,7 +298,7 @@ export default function Register() {
 
               {selectedDivision && filteredEmployees.length === 0 && (
                 <p className="text-xs text-amber-600">
-                  No unregistered employees in this division.
+                  Tidak ada peserta yang belum terdaftar di divisi ini.
                 </p>
               )}
             </div>
@@ -306,7 +308,7 @@ export default function Register() {
               <Label>Email</Label>
               <Input
                 type="email"
-                placeholder="Enter your email"
+                placeholder="Masukkan email Anda"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-12"
@@ -315,10 +317,10 @@ export default function Register() {
 
             {/* PASSWORD */}
             <div className="space-y-2 relative">
-              <Label>Password</Label>
+              <Label>Kata Sandi</Label>
               <Input
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter password"
+                placeholder="Masukkan kata sandi"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-12 pr-10"
@@ -341,16 +343,16 @@ export default function Register() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Membuat…
                 </>
               ) : (
-                "Register"
+                "Daftar"
               )}
             </Button>
 
             {/* GOOGLE REGISTER */}
             <div className="my-4 flex items-center justify-center text-gray-500 text-sm">
-              <span className="px-4">Instant Registration</span>
+              <span className="px-4">Pendaftaran Instan</span>
             </div>
 
             <Button
@@ -358,13 +360,13 @@ export default function Register() {
               className="w-full h-12 bg-white border text-black hover:bg-gray-100"
             >
               <img src="/google.png" alt="g" className="h-5 mr-2" />
-              Continue with Google
+              Lanjutkan dengan Google
             </Button>
 
             <div className="mt-4 text-center text-sm">
-              Already have an account?{" "}
+              Sudah punya akun?{" "}
               <a href="/login" className="text-blue-600 hover:underline">
-                Login
+                Masuk
               </a>
             </div>
           </form>
