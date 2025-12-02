@@ -1,0 +1,29 @@
+# Netlify Configuration for HRGroup Attendance QR
+
+[build]
+  command = "npm run build"
+  publish = "dist/public"
+
+# Handle SPA routing - all URLs that don't have a file extension
+# should be served by index.html (React Router will handle the routing)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Cache static assets with long expiration
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Don't cache HTML files
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
