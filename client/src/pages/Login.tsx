@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -49,12 +49,10 @@ export default function Login() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <div className="bg-primary rounded-xl p-3 text-primary-foreground">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
+            <img src="/logo.png" alt="HRGroup Logo" className="h-12 w-12" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            AttendanceQR
+            HRGroup Magang
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
             HR Group Management System
@@ -75,7 +73,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@hrgroup.com"
+                  placeholder="Input Your Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -88,6 +86,7 @@ export default function Login() {
                   id="password"
                   type="password"
                   value={password}
+                  placeholder="Input Your Password"
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="bg-white dark:bg-gray-950"
@@ -116,9 +115,6 @@ export default function Login() {
               >
                 Register
               </a>
-            </div>
-            <div className="mt-4 text-center text-xs text-gray-500">
-              <p>Demo Account: Use any valid Firebase credentials</p>
             </div>
           </CardContent>
         </Card>

@@ -8,7 +8,6 @@ import {
   LogOut,
   Menu,
   X,
-  CheckCircle2,
   UserCircle,
   History,
   Shield,
@@ -143,7 +142,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 font-bold text-xl text-primary">
-            <CheckCircle2 className="h-6 w-6" />
+            <img src="/logo.png" alt="Logo" className="h-6 w-6" />
             <span>AttendanceQR</span>
           </div>
           <button

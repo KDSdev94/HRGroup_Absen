@@ -20,18 +20,30 @@ export default function Scan() {
     if (isScanning && !scannerRef.current) {
       // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
-        const scanner = new Html5QrcodeScanner(
-          "reader",
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          /* verbose= */ false
-        );
+        try {
+          const scanner = new Html5QrcodeScanner(
+            "reader",
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+              aspectRatio: 1.0,
+              // Add explicit camera constraint for HTTPS/Netlify compatibility
+              disableFlip: false,
+            },
+            /* verbose= */ false
+          );
 
-        scanner.render(onScanSuccess, onScanFailure);
-        scannerRef.current = scanner;
+          scanner.render(onScanSuccess, onScanFailure);
+          scannerRef.current = scanner;
+        } catch (error) {
+          console.error("Failed to initialize scanner:", error);
+          toast({
+            variant: "destructive",
+            title: "Camera Error",
+            description:
+              "Could not access camera. Please check permissions and ensure HTTPS is enabled.",
+          });
+        }
       }, 100);
 
       return () => clearTimeout(timer);
@@ -44,7 +56,7 @@ export default function Scan() {
         scannerRef.current = null;
       }
     };
-  }, [isScanning]);
+  }, [isScanning, toast]);
 
   const onScanSuccess = async (decodedText: string, decodedResult: any) => {
     if (processing) return;

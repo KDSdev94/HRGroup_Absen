@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -144,12 +144,10 @@ export default function Register() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <div className="bg-primary rounded-xl p-3 text-primary-foreground">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
+            <img src="/logo.png" alt="HRGroup Logo" className="h-12 w-12" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            AttendanceQR
+            HRGroup Magang
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
             Employee Registration
@@ -223,7 +221,7 @@ export default function Register() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@company.com"
+                  placeholder="Input Your Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -234,6 +232,7 @@ export default function Register() {
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
+                  placeholder="Input Your Password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
