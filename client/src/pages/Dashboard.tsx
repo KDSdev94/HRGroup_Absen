@@ -14,19 +14,14 @@ export default function Dashboard() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
-          console.log("🔍 Fetching role for user:", currentUser.email);
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
             const userRole = userDoc.data().role;
-            console.log("✅ Role found in Firestore:", userRole);
             setRole(userRole);
           } else {
-            console.log("⚠️ No user document found in Firestore");
             if (currentUser.email === "admin@hrgroup.com") {
-              console.log("✅ Setting role to superadmin (hardcoded)");
               setRole("superadmin");
             } else {
-              console.log("✅ Setting role to employee (default)");
               setRole("employee");
             }
           }
@@ -35,7 +30,6 @@ export default function Dashboard() {
           setRole("employee");
         }
       } else {
-        console.log("❌ No authenticated user");
         setRole(null);
       }
       setLoading(false);
@@ -56,8 +50,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  console.log("📊 Rendering dashboard for role:", role);
 
   // Route to appropriate dashboard based on role
   // Employee role gets employee dashboard, everything else gets admin dashboard

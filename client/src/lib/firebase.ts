@@ -22,12 +22,6 @@ if (!firebaseConfig.apiKey) {
   console.error("❌ Firebase API Key is missing! Check your .env file.");
 }
 
-console.log("🔧 Firebase Config:", {
-  projectId: firebaseConfig.projectId,
-  authDomain: firebaseConfig.authDomain,
-  apiKeyPresent: !!firebaseConfig.apiKey,
-});
-
 let app: any = null;
 let auth: any = null;
 let db: any = null;
@@ -36,34 +30,21 @@ let storage: any = null;
 try {
   // Initialize Firebase only if not already initialized
   if (!getApps().length) {
-    console.log("📱 Initializing Firebase app...");
     app = initializeApp(firebaseConfig);
-    console.log("✅ Firebase app initialized");
   } else {
-    console.log("ℹ️ Firebase app already initialized");
     app = getApps()[0];
   }
 
-  console.log("🔐 Initializing Auth...");
   auth = getAuth(app);
-  console.log("✅ Auth initialized");
-
-  console.log("📊 Initializing Firestore...");
   db = getFirestore(app);
-  console.log("✅ Firestore initialized");
-
-  console.log("💾 Initializing Storage...");
   storage = getStorage(app);
-  console.log("✅ Storage initialized");
-
-  console.log("✅ Firebase initialized successfully");
 
   // Use emulators in development if available
   if (import.meta.env.DEV) {
     try {
       const hostname = window.location.hostname;
       if (hostname === "localhost" || hostname === "127.0.0.1") {
-        console.log("🏠 Running on localhost - emulators available");
+        // console.log("🏠 Running on localhost - emulators available");
         // Optionally use emulators for local development
         // connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
         // connectFirestoreEmulator(db, "localhost", 8080);

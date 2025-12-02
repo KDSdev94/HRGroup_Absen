@@ -22,7 +22,6 @@ export default function DashboardEmployee() {
   }, []);
 
   const fetchEmployeeData = async () => {
-    console.log("🔄 EmployeeDashboard: Starting fetchEmployeeData");
     try {
       if (!auth.currentUser) {
         console.error("❌ No authenticated user found");
@@ -30,22 +29,9 @@ export default function DashboardEmployee() {
         return;
       }
 
-      console.log(
-        "👤 Current user:",
-        auth.currentUser.email,
-        "UID:",
-        auth.currentUser.uid
-      );
-
       // STEP 1: Get employeeId using multiple fallback methods (same as AttendanceHistory)
       let employeeId: string | null = null;
       let employeeInfo: any = null;
-
-      console.log(
-        "🔍 Looking for employee ID for user:",
-        auth.currentUser.uid,
-        auth.currentUser.email
-      );
 
       // Try to get employeeId from the users collection
       try {
@@ -54,7 +40,6 @@ export default function DashboardEmployee() {
           const userData = userDoc.data();
           employeeId = userData.employeeId || userDoc.id;
           employeeInfo = userData;
-          console.log("✅ Found employeeId in users collection:", employeeId);
         }
       } catch (error) {
         console.log("User profile not found in users collection:", error);
@@ -69,10 +54,6 @@ export default function DashboardEmployee() {
           if (empDoc.exists()) {
             employeeId = empDoc.id;
             employeeInfo = empDoc.data();
-            console.log(
-              "✅ Found employeeId in employees collection (by UID as doc ID):",
-              employeeId
-            );
           }
         } catch (error) {
           console.log("Employee doc not found in employees collection:", error);
@@ -90,7 +71,6 @@ export default function DashboardEmployee() {
           if (!empSnapshot.empty) {
             employeeId = empSnapshot.docs[0].id;
             employeeInfo = empSnapshot.docs[0].data();
-            console.log("✅ Found employeeId by UID field query:", employeeId);
           }
         } catch (error) {
           console.log("No employee found by UID query:", error);
@@ -108,7 +88,6 @@ export default function DashboardEmployee() {
           if (!empSnapshot.empty) {
             employeeId = empSnapshot.docs[0].id;
             employeeInfo = empSnapshot.docs[0].data();
-            console.log("✅ Found employeeId by email query:", employeeId);
           }
         } catch (error) {
           console.log("No employee found by email query:", error);
@@ -118,10 +97,6 @@ export default function DashboardEmployee() {
       // If still no employeeId, use UID as fallback
       if (!employeeId) {
         employeeId = auth.currentUser.uid;
-        console.log(
-          "⚠️ No employeeId found, using UID as fallback:",
-          employeeId
-        );
       }
 
       // If we have employeeId but no employeeInfo, fetch it
@@ -130,32 +105,17 @@ export default function DashboardEmployee() {
           const empDoc = await getDoc(doc(db, "employees", employeeId));
           if (empDoc.exists()) {
             employeeInfo = empDoc.data();
-            console.log(
-              "✅ Fetched employee info by employeeId:",
-              employeeInfo
-            );
           }
         } catch (error) {
           console.log("Could not fetch employee info:", error);
         }
       }
 
-      console.log("📋 Final employeeId for queries:", employeeId);
-      console.log("👤 Employee info:", employeeInfo);
-      console.log("👤 Employee name:", employeeInfo?.name);
-      console.log("👤 Employee division:", employeeInfo?.division);
-      console.log("👤 Employee email:", employeeInfo?.email);
-
       // STEP 2: Query attendance with the found employeeId
       const today = new Date().toISOString().split("T")[0];
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
-
-      console.log("📅 Querying attendance for employeeId:", employeeId, {
-        today,
-        sevenDaysAgoStr,
-      });
 
       // Execute attendance queries in parallel
       const [todayAttendanceSnapshot, recentSnapshot] = await Promise.all([
@@ -178,11 +138,6 @@ export default function DashboardEmployee() {
         ),
       ]);
 
-      console.log("📊 Attendance query results:", {
-        todayAttendance: todayAttendanceSnapshot.docs.length,
-        recentAttendance: recentSnapshot.docs.length,
-      });
-
       // Process today's attendance
       let status = "absent";
       let checkInTime = null;
@@ -191,7 +146,6 @@ export default function DashboardEmployee() {
 
       todayAttendanceSnapshot.docs.forEach((doc) => {
         const data = doc.data();
-        console.log("📋 Today's attendance record:", data);
         if (data.type === "check-in") {
           status = "present";
           checkInTime = data.timestamp;
@@ -226,18 +180,10 @@ export default function DashboardEmployee() {
         }
       });
 
-      console.log("📋 Today's status:", {
-        status,
-        checkInTime,
-        checkOutTime,
-        isLate,
-      });
-
       // Process recent attendance and sort on client side
       const recentData = recentSnapshot.docs
         .map((doc) => {
           const data = doc.data();
-          console.log("📅 Recent record:", data);
           return data;
         })
         .filter((data) => {
@@ -257,8 +203,6 @@ export default function DashboardEmployee() {
         })
         .slice(0, 10); // Limit to 10 most recent
 
-      console.log("📅 Processed recent attendance records:", recentData.length);
-
       const stats = {
         name:
           employeeInfo?.name ||
@@ -273,7 +217,6 @@ export default function DashboardEmployee() {
         isLate,
       };
 
-      console.log("✅ Setting employee stats:", stats);
       setEmployeeStats(stats);
       setRecentAttendance(recentData);
     } catch (error) {
@@ -291,7 +234,6 @@ export default function DashboardEmployee() {
         isLate: false,
       });
     } finally {
-      console.log("✅ EmployeeDashboard: Finished loading");
       setLoading(false);
     }
   };

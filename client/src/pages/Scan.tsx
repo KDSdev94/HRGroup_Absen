@@ -74,16 +74,44 @@ export default function Scan() {
     // Initialize scanner only if we are in scanning mode and haven't initialized yet
     if (isScanning && !scannerRef.current) {
       // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         try {
+          // Request camera permissions explicitly for mobile devices
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: { ideal: "environment" }, // Prefer rear camera on mobile
+              },
+            });
+            // Stop the stream immediately - we just needed to trigger permission
+            stream.getTracks().forEach((track) => track.stop());
+          } catch (permError) {
+            console.warn("Camera permission request:", permError);
+            toast({
+              variant: "destructive",
+              title: "Izin Kamera Diperlukan",
+              description:
+                "Mohon izinkan akses kamera untuk melakukan scan QR code. Periksa pengaturan browser Anda.",
+            });
+            return;
+          }
+
           const scanner = new Html5QrcodeScanner(
             "reader",
             {
               fps: 10,
               qrbox: { width: 250, height: 250 },
               aspectRatio: 1.0,
-              // Add explicit camera constraint for HTTPS/Netlify compatibility
+              // Mobile-friendly camera constraints
               disableFlip: false,
+              // Explicitly request environment-facing (rear) camera for mobile
+              videoConstraints: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              // Support for different camera types
+              supportedScanTypes: [],
             },
             /* verbose= */ false
           );
@@ -94,9 +122,9 @@ export default function Scan() {
           console.error("Failed to initialize scanner:", error);
           toast({
             variant: "destructive",
-            title: "Camera Error",
+            title: "Error Kamera",
             description:
-              "Could not access camera. Please check permissions and ensure HTTPS is enabled.",
+              "Tidak dapat mengakses kamera. Pastikan Anda menggunakan HTTPS dan telah memberikan izin kamera.",
           });
         }
       }, 100);
@@ -206,13 +234,18 @@ export default function Scan() {
         );
       }
 
-      // Get Location
+      // Get Location with high accuracy
       const location = await new Promise<GeolocationPosition>(
         (resolve, reject) => {
           if (!navigator.geolocation) {
             reject(new Error("Geolocation is not supported by your browser"));
           } else {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
+            // Request high accuracy location with timeout
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true, // Use GPS if available
+              timeout: 10000, // 10 second timeout
+              maximumAge: 0, // Don't use cached position
+            });
           }
         }
       );
