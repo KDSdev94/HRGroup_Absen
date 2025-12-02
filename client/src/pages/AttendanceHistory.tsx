@@ -70,21 +70,41 @@ export default function AttendanceHistory() {
       }
 
       // Get user's employeeId from users collection
-      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      if (!userDoc.exists()) {
-        toast({
-          title: "Error",
-          description: "User profile not found",
-          variant: "destructive",
-        });
-        return;
+      let employeeId: string | null = null;
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          employeeId = userDoc.data().employeeId;
+        }
+      } catch (error) {
+        console.log(
+          "User profile not found in users collection, trying employees..."
+        );
       }
 
-      const employeeId = userDoc.data().employeeId;
+      // If no employeeId found, try to find by UID in employees collection
+      if (!employeeId) {
+        try {
+          const empQuery = query(
+            collection(db, "employees"),
+            where("uid", "==", currentUser.uid)
+          );
+          const empSnapshot = await getDocs(empQuery);
+          if (!empSnapshot.empty) {
+            employeeId = empSnapshot.docs[0].id;
+          }
+        } catch (error) {
+          console.log("No employee found by UID");
+        }
+      }
+
+      // If still no employeeId, show error
       if (!employeeId) {
         toast({
           title: "Error",
-          description: "Employee ID not linked to account",
+          description:
+            "Employee profile not found. Please contact admin to link your account.",
           variant: "destructive",
         });
         return;
