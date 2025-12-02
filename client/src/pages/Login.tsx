@@ -55,20 +55,32 @@ export default function Login() {
       return;
     }
 
+    console.log("Attempting to send reset email to:", resetEmail);
     setIsResetting(true);
     try {
       await sendPasswordResetEmail(auth, resetEmail);
+      console.log("Reset email sent successfully");
       toast({
-        title: "Email Sent",
-        description: "Password reset link has been sent to your email.",
+        title: "Check your email",
+        description:
+          "If an account exists, a password reset link has been sent. Check your spam folder too.",
+        duration: 5000,
       });
       setShowForgotDialog(false);
       setResetEmail("");
     } catch (error: any) {
+      console.error("Error sending reset email:", error);
+      let errorMessage = "Failed to send reset email.";
+      if (error.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email address.";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Invalid email address format.";
+      }
+
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to send reset email.",
+        description: errorMessage,
       });
     } finally {
       setIsResetting(false);

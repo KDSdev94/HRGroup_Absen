@@ -15,9 +15,14 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { signOut, sendPasswordResetEmail } from "firebase/auth";
+import {
+  signOut,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  onAuthStateChanged,
+} from "firebase/auth";
 import { useLocation } from "wouter";
-import { onAuthStateChanged } from "firebase/auth";
 
 export default function Profile() {
   const [userProfile, setUserProfile] = useState({
@@ -32,6 +37,15 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Password Change State
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     // Wait for auth state to be ready
@@ -207,6 +221,73 @@ export default function Profile() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New password and confirmation do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user || !user.email) throw new Error("User not authenticated");
+
+      // Re-authenticate user
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        passwordData.currentPassword
+      );
+      await reauthenticateWithCredential(user, credential);
+
+      // Update password
+      await updatePassword(user, passwordData.newPassword);
+
+      toast({
+        title: "Success",
+        description: "Password updated successfully",
+      });
+
+      setShowPasswordForm(false);
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      let errorMessage = "Failed to update password";
+      if (error.code === "auth/wrong-password") {
+        errorMessage = "Incorrect current password";
+      } else if (error.code === "auth/requires-recent-login") {
+        errorMessage =
+          "Please log out and log in again before changing password";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -353,42 +434,89 @@ export default function Profile() {
           <CardTitle>Security</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Password</p>
-              <p className="text-sm text-gray-500">
-                Change your password securely via email
-              </p>
+          {!showPasswordForm ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Password</p>
+                <p className="text-sm text-gray-500">
+                  Change your password securely
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowPasswordForm(true)}
+              >
+                Change Password
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                try {
-                  if (!userProfile.email) {
-                    toast({
-                      title: "Error",
-                      description: "No email address found for this user",
-                      variant: "destructive",
-                    });
-                    return;
+          ) : (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      currentPassword: e.target.value,
+                    })
                   }
-                  await sendPasswordResetEmail(auth, userProfile.email);
-                  toast({
-                    title: "Email Sent",
-                    description: `Password reset link sent to ${userProfile.email}`,
-                  });
-                } catch (error: any) {
-                  toast({
-                    title: "Error",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              Change Password
-            </Button>
-          </div>
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      newPassword: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowPasswordForm(false);
+                    setPasswordData({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+                  }}
+                  disabled={passwordLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={passwordLoading}
+                >
+                  {passwordLoading ? "Updating..." : "Update Password"}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

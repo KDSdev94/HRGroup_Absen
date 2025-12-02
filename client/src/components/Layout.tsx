@@ -11,16 +11,25 @@ import {
   UserCircle,
   History,
   Shield,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
   const { toast } = useToast();
@@ -28,7 +37,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if auth is available
     if (!auth) {
-      console.error("❌ Firebase Auth is not initialized. Check your .env.local file.");
+      console.error(
+        "❌ Firebase Auth is not initialized. Check your .env.local file."
+      );
       if (location !== "/login" && location !== "/register") {
         setLocation("/login");
       }
@@ -148,17 +159,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
-          transform transition-transform duration-200 ease-in-out
+          bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+          transform transition-all duration-300 ease-in-out
           ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
+          ${isCollapsed ? "w-20" : "w-64"}
+          flex flex-col
         `}
       >
-        <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2 font-bold text-xl text-primary">
-            <img src="/logo.png" alt="Logo" className="h-6 w-6" />
-            <span>AttendanceQR</span>
+        <div
+          className={`h-16 flex items-center ${
+            isCollapsed ? "justify-center" : "px-6"
+          } border-b border-gray-200 dark:border-gray-700 transition-all duration-300`}
+        >
+          <div className="flex items-center gap-2 font-bold text-xl text-primary overflow-hidden whitespace-nowrap">
+            <img src="/logo.png" alt="Logo" className="h-8 w-8 shrink-0" />
+            <span
+              className={`transition-opacity duration-300 ${
+                isCollapsed ? "opacity-0 w-0" : "opacity-100"
+              }`}
+            >
+              AttendanceQR
+            </span>
           </div>
           <button
             className="ml-auto lg:hidden"
@@ -168,58 +191,112 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive = location === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <a
-                  className={`
-                    flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors
-                    ${
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50"
-                    }
-                  `}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </a>
-              </Link>
-            );
-          })}
+        <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
+          <TooltipProvider delayDuration={0}>
+            {navItems.map((item) => {
+              const isActive = location === item.href;
+              return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>
+                    <Link href={item.href}>
+                      <a
+                        className={`
+                          flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200
+                          ${
+                            isActive
+                              ? "bg-primary/10 text-primary"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                          }
+                          ${isCollapsed ? "justify-center" : ""}
+                        `}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <item.icon
+                          className={`h-5 w-5 shrink-0 ${
+                            isActive ? "text-primary" : ""
+                          }`}
+                        />
+                        <span
+                          className={`whitespace-nowrap transition-all duration-300 ${
+                            isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      </a>
+                    </Link>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right">{item.label}</TooltipContent>
+                  )}
+                </Tooltip>
+              );
+            })}
+          </TooltipProvider>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3 px-4 py-3 mb-2">
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-              {user?.email?.[0]?.toUpperCase() || "U"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
-                {user?.email || "User"}
-              </p>
-              <p className="text-xs text-gray-500 truncate capitalize">
-                {role || "Loading..."}
-              </p>
-            </div>
-          </div>
+        {/* Collapse Toggle Button (Desktop Only) */}
+        <div className="hidden lg:flex justify-end p-2 border-t border-gray-200 dark:border-gray-700">
           <Button
-            variant="outline"
-            className="w-full justify-start gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100"
-            onClick={handleLogout}
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="w-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700"
           >
-            <LogOut className="h-4 w-4" />
-            Log Out
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </Button>
+        </div>
+
+        <div
+          className={`p-4 border-t border-gray-200 dark:border-gray-700 ${
+            isCollapsed ? "items-center" : ""
+          }`}
+        >
+          {!isCollapsed && (
+            <div className="flex items-center gap-3 px-2 py-2 mb-2 animate-in fade-in duration-300">
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
+                {user?.email?.[0]?.toUpperCase() || "U"}
+              </div>
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
+                  {user?.email || "User"}
+                </p>
+                <p className="text-xs text-gray-500 truncate capitalize">
+                  {role || "Loading..."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`w-full ${
+                    isCollapsed ? "justify-center px-2" : "justify-start gap-2"
+                  } text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100 transition-all`}
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  {!isCollapsed && <span>Log Out</span>}
+                </Button>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">Log Out</TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen min-w-0">
-        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 lg:px-8 justify-between lg:justify-end">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300">
+        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 lg:px-8 justify-between lg:justify-end sticky top-0 z-30">
           <button
             className="lg:hidden p-2 -ml-2 text-gray-600"
             onClick={() => setSidebarOpen(true)}
@@ -240,7 +317,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <div className="max-w-6xl mx-auto">{children}</div>
+          <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {children}
+          </div>
         </main>
       </div>
     </div>

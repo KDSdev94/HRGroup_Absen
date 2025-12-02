@@ -3,17 +3,72 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, AlertTriangle, RefreshCcw, Loader2, Clock } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCcw,
+  Loader2,
+  Clock,
+} from "lucide-react";
+import { db, auth } from "@/lib/firebase";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function Scan() {
   const [scanResult, setScanResult] = useState<any | null>(null);
   const [isScanning, setIsScanning] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(
+    null
+  );
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const { toast } = useToast();
+
+  // Fetch logged-in user's employee ID
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // 1. Try users collection
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists() && userDoc.data().employeeId) {
+            setCurrentEmployeeId(userDoc.data().employeeId);
+            return;
+          }
+
+          // 2. Try employees collection (doc ID = UID)
+          const empDoc = await getDoc(doc(db, "employees", user.uid));
+          if (empDoc.exists()) {
+            setCurrentEmployeeId(empDoc.id);
+            return;
+          }
+
+          // 3. Try querying employees by uid field
+          const q = query(
+            collection(db, "employees"),
+            where("uid", "==", user.uid)
+          );
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            setCurrentEmployeeId(snapshot.docs[0].id);
+          }
+        } catch (error) {
+          console.error("Error fetching employee ID:", error);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     // Initialize scanner only if we are in scanning mode and haven't initialized yet
@@ -56,7 +111,28 @@ export default function Scan() {
         scannerRef.current = null;
       }
     };
-  }, [isScanning, toast]);
+  }, [isScanning, toast, currentEmployeeId]);
+
+  // Helper to get current time in WIB
+  const getWIBTime = () => {
+    const now = new Date();
+    const wibString = now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+    const wibDate = new Date(wibString);
+    return {
+      date: wibDate,
+      day: wibDate.getDay(), // 0 = Sunday, 1 = Monday, ...
+      hours: wibDate.getHours(),
+      minutes: wibDate.getMinutes(),
+      dateString: wibDate.toISOString().split("T")[0],
+    };
+  };
+
+  // List of holidays (YYYY-MM-DD)
+  const HOLIDAYS = [
+    "2025-01-01", // New Year
+    "2025-12-25", // Christmas
+    // Add more holidays here
+  ];
 
   const onScanSuccess = async (decodedText: string, decodedResult: any) => {
     if (processing) return;
@@ -73,6 +149,63 @@ export default function Scan() {
       const data = JSON.parse(decodedText);
       if (!data.id || !data.name) throw new Error("Invalid QR Code");
 
+      // --- SECURITY CHECK ---
+      if (!currentEmployeeId) {
+        throw new Error("Gagal memverifikasi akun. Pastikan Anda sudah login.");
+      }
+
+      if (data.id !== currentEmployeeId) {
+        throw new Error(
+          "QR Code ini bukan milik akun Anda. Dilarang menggunakan QR Code orang lain."
+        );
+      }
+
+      // --- TIME VALIDATION LOGIC (WIB) ---
+      const { date, day, hours, minutes, dateString } = getWIBTime();
+      const currentTime = hours + minutes / 60; // Decimal hours (e.g., 8.5 for 08:30)
+
+      console.log("🕒 Time Check (WIB):", {
+        fullDate: date,
+        day,
+        hours,
+        minutes,
+        currentTime,
+        dateString,
+      });
+
+      // 1. Check Sunday
+      if (day === 0) {
+        throw new Error("Absensi libur pada hari Minggu.");
+      }
+
+      // 2. Check Holidays
+      if (HOLIDAYS.includes(dateString)) {
+        throw new Error("Absensi libur pada tanggal merah.");
+      }
+
+      // 3. Check Operating Hours
+      let startTime = 8.0; // 08:00 WIB
+      let endTime = 16.0; // 16:00 WIB
+
+      if (day === 6) {
+        // Saturday
+        endTime = 12.0; // 12:00 WIB
+      }
+
+      console.log(`🕒 Operating Hours: ${startTime}:00 - ${endTime}:00`);
+
+      if (currentTime < startTime) {
+        throw new Error(`Absensi belum dibuka. Dimulai pukul 08:00 WIB.`);
+      }
+
+      if (currentTime > endTime) {
+        throw new Error(
+          `Absensi sudah ditutup. Berakhir pukul ${
+            day === 6 ? "12:00" : "16:00"
+          } WIB.`
+        );
+      }
+
       // Get Location
       const location = await new Promise<GeolocationPosition>(
         (resolve, reject) => {
@@ -86,12 +219,11 @@ export default function Scan() {
 
       const { latitude, longitude } = location.coords;
 
-      // Check if employee has already checked in today but not checked out
-      const today = new Date().toISOString().split("T")[0];
+      // Check if employee has already checked in today
       const checkInQuery = query(
         collection(db, "attendance"),
         where("employeeId", "==", data.id),
-        where("date", "==", today),
+        where("date", "==", dateString),
         where("type", "==", "check-in")
       );
       const checkInSnapshot = await getDocs(checkInQuery);
@@ -100,29 +232,36 @@ export default function Scan() {
       const checkOutQuery = query(
         collection(db, "attendance"),
         where("employeeId", "==", data.id),
-        where("date", "==", today),
+        where("date", "==", dateString),
         where("type", "==", "check-out")
       );
       const checkOutSnapshot = await getDocs(checkOutQuery);
 
       let attendanceType = "check-in";
-      let successMessage = `Welcome, ${data.name}! Location recorded.`;
+      let successMessage = `Welcome, ${data.name}! Check-in recorded.`;
 
-      // Logic: If they have already checked in but not out, record check-out
-      // If they have already checked out, give an error message
-      if (checkInSnapshot.size > 0 && checkOutSnapshot.size === 0) {
-        // Record check-out
+      // Logic:
+      // - If no check-in -> Check-in
+      // - If check-in exists but no check-out -> Check-out
+      // - If check-out exists -> Error (Already done)
+
+      if (checkInSnapshot.empty) {
+        // First scan of the day: Check-in
+        attendanceType = "check-in";
+        successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
+      } else if (checkOutSnapshot.empty) {
+        // Second scan of the day: Check-out
         attendanceType = "check-out";
-        successMessage = `Goodbye, ${data.name}! Check-out recorded.`;
-      } else if (checkOutSnapshot.size > 0) {
-        // Already checked out today - show error
-        throw new Error("Employee has already checked out today.");
+        successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
+      } else {
+        // Already checked out
+        throw new Error("Anda sudah melakukan absen pulang hari ini.");
       }
 
       // Update scan result to include attendance type
       setScanResult({
         ...data,
-        type: attendanceType
+        type: attendanceType,
       });
 
       // Log attendance to Firebase with Location
@@ -130,8 +269,8 @@ export default function Scan() {
         employeeId: data.id,
         employeeName: data.name,
         division: data.division,
-        timestamp: serverTimestamp(),
-        date: today,
+        timestamp: serverTimestamp(), // Server timestamp is safer
+        date: dateString,
         type: attendanceType,
         location: {
           latitude,
@@ -140,7 +279,10 @@ export default function Scan() {
       });
 
       toast({
-        title: "Attendance Recorded",
+        title:
+          attendanceType === "check-in"
+            ? "Check In Berhasil"
+            : "Check Out Berhasil",
         description: successMessage,
       });
     } catch (error: any) {
@@ -151,16 +293,14 @@ export default function Scan() {
         // PERMISSION_DENIED
         errorMessage =
           "Location permission denied. Please enable location services.";
-      } else if (error.message === "Invalid QR Code") {
-        errorMessage = "Invalid QR Code format.";
-      } else if (error.message === "Employee has already checked out today.") {
-        errorMessage = "You have already checked out today.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
 
       setScanResult({ error: errorMessage });
       toast({
         variant: "destructive",
-        title: "Scan Failed",
+        title: "Scan Gagal",
         description: errorMessage,
       });
     } finally {
@@ -191,9 +331,12 @@ export default function Scan() {
       <Card className="overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-xl">
         <CardContent className="p-0">
           {isScanning ? (
-            <div className="bg-black relative min-h-[400px] flex flex-col items-center justify-center text-white">
-              <div id="reader" className="w-full"></div>
-              <p className="text-sm text-gray-400 absolute bottom-4">
+            <div className="bg-black relative min-h-[400px] flex flex-col items-center justify-center text-white p-4">
+              <div
+                id="reader"
+                className="w-full rounded-lg overflow-hidden"
+              ></div>
+              <p className="text-sm text-gray-400 mt-4 text-center">
                 Ensure good lighting for best results
               </p>
             </div>
@@ -228,11 +371,22 @@ export default function Scan() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">
-                      {scanResult?.type === "check-out" ? "Check Out Successful!" : "Check In Successful!"}
+                      {scanResult?.type === "check-out"
+                        ? "Check Out Successful!"
+                        : "Check In Successful!"}
                     </h2>
                     <p className="text-gray-500 mt-1">
-                      {scanResult?.type === "check-out" ? "Goodbye!" : "Welcome!"}
-                      {" Recorded at "}{new Date().toLocaleTimeString()}
+                      {scanResult?.type === "check-out"
+                        ? "Goodbye!"
+                        : "Welcome!"}
+                      {" Recorded at "}
+                      {new Date().toLocaleTimeString("id-ID", {
+                        timeZone: "Asia/Jakarta",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                      })}
                     </p>
                   </div>
 
@@ -263,7 +417,9 @@ export default function Scan() {
                           Type
                         </span>
                         <p className="font-medium">
-                          {scanResult?.type === "check-out" ? "Check Out" : "Check In"}
+                          {scanResult?.type === "check-out"
+                            ? "Check Out"
+                            : "Check In"}
                         </p>
                       </div>
                     </CardContent>

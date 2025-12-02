@@ -4,16 +4,21 @@ import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 // Load Firebase config from environment variables
+// Load Firebase config from environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBDfugpjTuTfZXt7GYO-TOWpw5aQvOTdxc",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "absensi-app-b623f.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://absensi-app-b623f-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "absensi-app-b623f",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "absensi-app-b623f.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "784949401876",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:784949401876:web:c88d68ade9b53bc473ca01",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-Z1B3RMDQVD",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
+
+if (!firebaseConfig.apiKey) {
+  console.error("❌ Firebase API Key is missing! Check your .env file.");
+}
 
 console.log("🔧 Firebase Config:", {
   projectId: firebaseConfig.projectId,
@@ -86,7 +91,7 @@ try {
   console.error("  5. Restart your development server");
   console.error("  6. Clear browser cache (Ctrl+Shift+Delete)");
   console.error("  7. Check browser console for detailed error");
-  
+
   // Don't throw - allow app to load with null services
   console.warn("⚠️ Firebase services may not be available");
 }
