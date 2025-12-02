@@ -3,17 +3,19 @@ import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
-// Load Firebase config from environment variables
-// Load Firebase config from environment variables
+// ⚠️ WARNING: HARDCODED CREDENTIALS - NOT SECURE!
+// TODO: Move these to .env.local for production
+// This is a temporary solution for development only
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyBDfugpjTuTfZXt7GYO-TOWpw5aQvOTdxc",
+  authDomain: "absensi-app-b623f.firebaseapp.com",
+  databaseURL:
+    "https://absensi-app-b623f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "absensi-app-b623f",
+  storageBucket: "absensi-app-b623f.firebasestorage.app",
+  messagingSenderId: "784949401876",
+  appId: "1:784949401876:web:c88d68ade9b53bc473ca01",
+  measurementId: "G-Z1B3RMDQVD",
 };
 
 if (!firebaseConfig.apiKey) {
