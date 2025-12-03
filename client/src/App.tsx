@@ -14,6 +14,8 @@ import Scan from "@/pages/Scan";
 import Reports from "@/pages/Reports";
 import AttendanceHistory from "@/pages/AttendanceHistory";
 import Admins from "@/pages/Admins";
+import EmployeeUsers from "@/pages/EmployeeUsers";
+import DataCleanup from "@/pages/DataCleanup";
 import Profile from "@/pages/Profile";
 import Layout from "@/components/Layout";
 
@@ -25,6 +27,8 @@ function Router() {
         <Route path="/register" component={Register} />
         <Route path="/" component={Dashboard} />
         <Route path="/employees" component={Employees} />
+        <Route path="/employee-users" component={EmployeeUsers} />
+        <Route path="/data-cleanup" component={DataCleanup} />
         <Route path="/scan" component={Scan} />
         <Route path="/reports" component={Reports} />
         <Route path="/attendance-history" component={AttendanceHistory} />

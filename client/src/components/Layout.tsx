@@ -15,6 +15,8 @@ import {
   ChevronRight,
   Sun,
   Moon,
+  Users2,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -116,6 +118,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       icon: Shield,
       label: "Admin",
       href: "/admins",
+      roles: ["superadmin"],
+    },
+    {
+      icon: Users2,
+      label: "User Karyawan",
+      href: "/employee-users",
+      roles: ["superadmin"],
+    },
+    {
+      icon: Database,
+      label: "Pembersihan Data",
+      href: "/data-cleanup",
       roles: ["superadmin"],
     },
     {

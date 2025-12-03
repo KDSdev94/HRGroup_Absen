@@ -225,13 +225,27 @@ export default function Login() {
         relative overflow-hidden
       "
       >
-        <img
-          key={currentImage}
-          src={images[currentImage]}
-          className="w-full h-full object-cover transition-opacity duration-700"
-        />
+        {/* Image Slider with Fade + Slide Animation */}
+        {images.map((image, index) => (
+          <img
+            key={index}
+            src={image}
+            className={`
+              absolute inset-0 w-full h-full object-cover
+              transition-all duration-1000 ease-in-out
+              ${
+                index === currentImage
+                  ? "opacity-100 translate-x-0 scale-100"
+                  : index === (currentImage - 1 + images.length) % images.length
+                  ? "opacity-0 -translate-x-full scale-105"
+                  : "opacity-0 translate-x-full scale-95"
+              }
+            `}
+            alt={`Slide ${index + 1}`}
+          />
+        ))}
 
-        <div className="absolute bottom-4 left-4 lg:bottom-12 lg:left-14 text-white">
+        <div className="absolute bottom-4 left-4 lg:bottom-12 lg:left-14 text-white z-10">
           <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2">
             HRGroup Management
           </h1>
