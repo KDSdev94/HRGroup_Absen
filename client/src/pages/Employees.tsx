@@ -137,13 +137,13 @@ export default function Employees() {
       // Log activity
       await logActivity(
         formData.name,
-        `Menambahkan karyawan baru: ${formData.name} (${formData.employeeId})`,
+        `Menambahkan peserta baru: ${formData.name} (${formData.employeeId})`,
         "add-employee",
         formData.division
       );
 
       toast({
-        title: "Karyawan Ditambahkan",
+        title: "Peserta Ditambahkan",
         description: `${formData.name} berhasil ditambahkan.`,
       });
       setIsAddOpen(false);
@@ -153,7 +153,7 @@ export default function Employees() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Gagal menambahkan karyawan.",
+        description: "Gagal menambahkan peserta.",
       });
     }
   };
@@ -193,14 +193,14 @@ export default function Employees() {
 
       await logActivity(
         formData.name,
-        `Mengedit data karyawan. Perubahan: ${changes.join(", ")}`,
+        `Mengedit data peserta. Perubahan: ${changes.join(", ")}`,
         "edit-employee",
         formData.division
       );
 
       toast({
-        title: "Karyawan Diperbarui",
-        description: "Data karyawan berhasil diperbarui.",
+        title: "Peserta Diperbarui",
+        description: "Data peserta berhasil diperbarui.",
       });
       setIsEditOpen(false);
       setFormData({ employeeId: "", name: "", division: "" });
@@ -210,18 +210,18 @@ export default function Employees() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Gagal memperbarui karyawan.",
+        description: "Gagal memperbarui peserta.",
       });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus karyawan ini?")) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus peserta ini?")) return;
     try {
       await deleteDoc(doc(db, "employees", id));
       toast({
         title: "Dihapus",
-        description: "Karyawan berhasil dihapus.",
+        description: "Peserta berhasil dihapus.",
       });
       fetchEmployees();
     } catch (error) {
@@ -263,21 +263,21 @@ export default function Employees() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Karyawan
+            Peserta
           </h1>
           <p className="text-gray-500 mt-2">
-            Kelola data karyawan dan generate QR code.
+            Kelola data Peserta dan generate QR code.
           </p>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
-              <Plus className="h-4 w-4" /> Tambah Karyawan
+              <Plus className="h-4 w-4" /> Tambah Peserta
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Tambah Karyawan Baru</DialogTitle>
+              <DialogTitle>Tambah Peserta Baru</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddEmployee} className="space-y-4 mt-4">
               <div className="space-y-2">
@@ -324,7 +324,7 @@ export default function Employees() {
                 </Select>
               </div>
               <DialogFooter>
-                <Button type="submit">Simpan Karyawan</Button>
+                <Button type="submit">Simpan Peserta</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -334,7 +334,7 @@ export default function Employees() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ubah Karyawan</DialogTitle>
+            <DialogTitle>Ubah Peserta</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpdateEmployee} className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -345,11 +345,11 @@ export default function Employees() {
                 className="bg-gray-100"
               />
               <p className="text-xs text-gray-500">
-                ID Karyawan tidak dapat diubah.
+                ID Peserta tidak dapat diubah.
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Full Name</Label>
+              <Label>Nama Lengkap</Label>
               <Input
                 required
                 value={formData.name}
@@ -359,7 +359,7 @@ export default function Employees() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Division</Label>
+              <Label>Divisi</Label>
               <Select
                 required
                 value={formData.division}
@@ -380,7 +380,7 @@ export default function Employees() {
               </Select>
             </div>
             <DialogFooter>
-              <Button type="submit">Perbarui Karyawan</Button>
+              <Button type="submit">Perbarui Peserta</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -391,7 +391,7 @@ export default function Employees() {
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
             <Input
-              placeholder="Cari berdasarkan nama, ID karyawan, atau divisi..."
+              placeholder="Cari berdasarkan nama, ID Peserta, atau divisi..."
               className="pl-8 max-w-md"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -402,9 +402,9 @@ export default function Employees() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Employee ID</TableHead>
+                <TableHead>ID Peserta</TableHead>
                 <TableHead>Nama</TableHead>
-                <TableHead>Division</TableHead>
+                <TableHead>Divisi</TableHead>
                 <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
@@ -415,7 +415,7 @@ export default function Employees() {
                     colSpan={4}
                     className="text-center py-8 text-gray-500"
                   >
-                    Loading karyawan...
+                    Loading Peserta...
                   </TableCell>
                 </TableRow>
               ) : filteredEmployees.length === 0 ? (
@@ -424,7 +424,7 @@ export default function Employees() {
                     colSpan={4}
                     className="text-center py-8 text-gray-500"
                   >
-                    Tidak ada karyawan ditemukan. Tambahkan untuk memulai.
+                    Tidak ada Peserta ditemukan. Tambahkan untuk memulai.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -449,7 +449,7 @@ export default function Employees() {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
-                            <DialogTitle>QR Code Karyawan</DialogTitle>
+                            <DialogTitle>QR Code Peserta</DialogTitle>
                           </DialogHeader>
                           <div className="flex flex-col items-center justify-center p-6 space-y-4">
                             <div className="bg-white p-4 rounded-xl border shadow-sm">
