@@ -45,9 +45,24 @@ try {
   storage = getStorage(app);
 
   // Set persistence for better mobile compatibility
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.warn("⚠️ Could not set auth persistence:", error);
-  });
+  // Try browserLocalPersistence first, fallback to indexedDB if needed
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("✅ Auth persistence set to browserLocalPersistence");
+    })
+    .catch(async (error) => {
+      console.warn("⚠️ Could not set browserLocalPersistence:", error);
+      // Try indexedDB as fallback for mobile browsers
+      try {
+        const { indexedDBLocalPersistence } = await import("firebase/auth");
+        await setPersistence(auth, indexedDBLocalPersistence);
+        console.log(
+          "✅ Auth persistence set to indexedDBLocalPersistence (fallback)"
+        );
+      } catch (fallbackError) {
+        console.error("❌ Could not set any persistence:", fallbackError);
+      }
+    });
 
   // Use emulators in development if available
   if (import.meta.env.DEV) {

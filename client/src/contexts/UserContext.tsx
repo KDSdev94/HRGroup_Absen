@@ -1,14 +1,20 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { 
-  User as FirebaseUser, 
-  onAuthStateChanged, 
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import {
+  User as FirebaseUser,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   confirmPasswordReset,
-  Auth
+  Auth,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -25,7 +31,11 @@ interface User {
 interface UserContextType {
   currentUser: User | null;
   loading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean
+  ) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
@@ -55,32 +65,93 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   // Handle Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
-      if (user) {
-        const role = await getUserRole(user.uid);
-        const userData: User = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          role
-        };
-        setCurrentUser(userData);
-      } else {
-        setCurrentUser(null);
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (user: FirebaseUser | null) => {
+        if (user) {
+          const role = await getUserRole(user.uid);
+          const userData: User = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            role,
+          };
+          setCurrentUser(userData);
+        } else {
+          setCurrentUser(null);
+        }
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, []);
 
+  // Handle Google redirect result for mobile devices
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const { getRedirectResult } = await import("firebase/auth");
+        const result = await getRedirectResult(auth);
+
+        if (result && result.user) {
+          console.log("✅ Handling redirect result for:", result.user.email);
+
+          // Save email for "remember me" functionality
+          if (result.user.email) {
+            localStorage.setItem("rememberEmail", result.user.email);
+          }
+
+          const role = await getUserRole(result.user.uid);
+          const userData: User = {
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            photoURL: result.user.photoURL,
+            role,
+          };
+          setCurrentUser(userData);
+          console.log("✅ Redirect login complete with role:", role);
+        }
+      } catch (error: any) {
+        console.error("❌ Error handling redirect result:", error);
+        // Don't throw - this is just checking for redirect result
+      }
+    };
+
+    handleRedirectResult();
+  }, []);
+
   // Login with email and password
-  const login = async (email: string, password: string, rememberMe: boolean = false) => {
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe: boolean = false
+  ) => {
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log("🔐 Attempting login for:", email);
+
+      // Add timeout protection for slow mobile networks
+      const loginPromise = signInWithEmailAndPassword(auth, email, password);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error("Login timeout - please check your internet connection")
+            ),
+          30000
+        )
+      );
+
+      const result = (await Promise.race([
+        loginPromise,
+        timeoutPromise,
+      ])) as any;
       const user = result.user;
-      
+
+      console.log("✅ Login successful for:", user.email);
+
       // If rememberMe is checked, save the email to localStorage
       if (rememberMe) {
         localStorage.setItem("rememberEmail", email);
@@ -94,10 +165,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        role
+        role,
       };
       setCurrentUser(userData);
-    } catch (error) {
+
+      console.log("✅ User data set with role:", role);
+    } catch (error: any) {
+      console.error("❌ Login error:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
       throw error;
     }
   };
@@ -105,10 +181,56 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Login with Google
   const loginWithGoogle = async () => {
     try {
+      console.log("🔐 Attempting Google login...");
+
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+
+      // Add custom parameters for better mobile support
+      provider.setCustomParameters({
+        prompt: "select_account",
+        // Force mobile-friendly flow
+        display: "popup",
+      });
+
+      // For mobile devices, use redirect instead of popup
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      let result;
+      if (isMobile) {
+        console.log("📱 Mobile detected - using redirect flow");
+        // Import signInWithRedirect for mobile
+        const { signInWithRedirect, getRedirectResult } = await import(
+          "firebase/auth"
+        );
+
+        // Check if we're returning from a redirect
+        const redirectResult = await getRedirectResult(auth);
+        if (redirectResult) {
+          result = redirectResult;
+          console.log("✅ Got redirect result");
+        } else {
+          // Start the redirect flow
+          await signInWithRedirect(auth, provider);
+          // This will redirect the page, so code below won't execute
+          return;
+        }
+      } else {
+        console.log("💻 Desktop detected - using popup flow");
+        // Add timeout for popup
+        const popupPromise = signInWithPopup(auth, provider);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Google login timeout - please try again")),
+            30000
+          )
+        );
+
+        result = (await Promise.race([popupPromise, timeoutPromise])) as any;
+      }
+
       const user = result.user;
-      
+      console.log("✅ Google login successful for:", user.email);
+
       // Save email for "remember me" functionality
       if (user.email) {
         localStorage.setItem("rememberEmail", user.email);
@@ -120,10 +242,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        role
+        role,
       };
       setCurrentUser(userData);
-    } catch (error) {
+
+      console.log("✅ Google user data set with role:", role);
+    } catch (error: any) {
+      console.error("❌ Google login error:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+
+      // Provide more helpful error messages
+      if (error.code === "auth/popup-blocked") {
+        throw new Error(
+          "Popup diblokir oleh browser. Silakan izinkan popup atau coba lagi."
+        );
+      } else if (error.code === "auth/popup-closed-by-user") {
+        throw new Error("Login dibatalkan. Silakan coba lagi.");
+      } else if (error.code === "auth/network-request-failed") {
+        throw new Error("Koneksi internet bermasalah. Periksa jaringan Anda.");
+      } else if (error.message && error.message.includes("timeout")) {
+        throw new Error(
+          "Login timeout. Periksa koneksi internet Anda dan coba lagi."
+        );
+      }
+
       throw error;
     }
   };
@@ -168,7 +311,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: auth.currentUser.email,
         displayName: auth.currentUser.displayName,
         photoURL: auth.currentUser.photoURL,
-        role
+        role,
       };
       setCurrentUser(userData);
     } else if (rememberedEmail && !auth.currentUser) {
@@ -186,14 +329,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     logout,
     forgotPassword,
     resetPassword,
-    autoLogin
+    autoLogin,
   };
 
-  return (
-    <UserContext.Provider value={value}>
-      {children}
-    </UserContext.Provider>
-  );
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
 export function useUser() {

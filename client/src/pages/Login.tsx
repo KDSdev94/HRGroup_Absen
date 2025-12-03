@@ -47,6 +47,46 @@ export default function Login() {
     }
   }, []);
 
+  // Handle Google redirect result for mobile devices
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const { getRedirectResult } = await import("firebase/auth");
+        const { auth } = await import("@/lib/firebase");
+
+        setIsLoading(true);
+        const result = await getRedirectResult(auth);
+
+        if (result && result.user) {
+          console.log(
+            "✅ Google redirect login successful:",
+            result.user.email
+          );
+          toast({
+            title: "Berhasil",
+            description: "Login dengan Google berhasil!",
+          });
+          // UserContext will handle the rest
+          setLocation("/");
+        }
+      } catch (error: any) {
+        console.error("❌ Redirect result error:", error);
+        if (error.code && error.code !== "auth/popup-closed-by-user") {
+          toast({
+            variant: "destructive",
+            title: "Login Google Gagal",
+            description:
+              error.message || "Terjadi kesalahan saat login dengan Google",
+          });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkRedirectResult();
+  }, []);
+
   const handleConfirmResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmNewPassword) {
@@ -152,15 +192,41 @@ export default function Login() {
   // LOGIN EMAIL + PASSWORD
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate inputs before attempting login
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Email dan password harus diisi.",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Password minimal 6 karakter.",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      console.log("🔐 Starting login process...");
       await login(email, password, remember);
 
+      console.log("✅ Login successful, redirecting...");
       toast({ title: "Berhasil", description: "Selamat datang kembali!" });
-      setLocation("/");
+
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        setLocation("/");
+      }, 100);
     } catch (error: any) {
-      console.error("Login error:", error);
+      console.error("❌ Login error:", error);
 
       let errorMessage = "Email atau password salah.";
 
@@ -174,12 +240,17 @@ export default function Login() {
       } else if (error.code === "auth/user-disabled") {
         errorMessage = "Akun ini telah dinonaktifkan.";
       } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Terlalu banyak percobaan login. Coba lagi nanti.";
+        errorMessage =
+          "Terlalu banyak percobaan login. Tunggu beberapa saat dan coba lagi.";
       } else if (error.code === "auth/network-request-failed") {
-        errorMessage = "Koneksi internet bermasalah. Periksa jaringan Anda.";
+        errorMessage =
+          "Koneksi internet bermasalah. Periksa jaringan Anda dan coba lagi.";
       } else if (error.code === "auth/invalid-credential") {
         errorMessage =
           "Email atau password salah. Periksa kembali kredensial Anda.";
+      } else if (error.message && error.message.includes("timeout")) {
+        errorMessage =
+          "Login timeout. Koneksi internet Anda mungkin lambat. Silakan coba lagi.";
       }
 
       toast({
@@ -194,19 +265,46 @@ export default function Login() {
   };
 
   const handleGoogle = async () => {
+    setIsLoading(true);
     try {
+      console.log("🔐 Starting Google login...");
       await loginWithGoogle();
+
+      // For redirect flow (mobile), the function will return early
+      // and the page will redirect. This code only runs for popup flow.
+      console.log("✅ Google login successful, redirecting...");
       toast({
         title: "Berhasil",
-        description: "Masuk dengan Google berhasil!",
+        description: "Login dengan Google berhasil!",
       });
-      setLocation("/");
+
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        setLocation("/");
+      }, 100);
     } catch (error: any) {
+      console.error("❌ Google login error:", error);
+
+      let errorMessage = "Gagal login dengan Google. Silakan coba lagi.";
+
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.code === "auth/popup-blocked") {
+        errorMessage = "Popup diblokir. Silakan izinkan popup di browser Anda.";
+      } else if (error.code === "auth/cancelled-popup-request") {
+        errorMessage = "Login dibatalkan. Silakan coba lagi.";
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Koneksi internet bermasalah. Periksa jaringan Anda.";
+      }
+
       toast({
         variant: "destructive",
         title: "Login Google Gagal",
-        description: error.message,
+        description: errorMessage,
+        duration: 5000,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
   return (
