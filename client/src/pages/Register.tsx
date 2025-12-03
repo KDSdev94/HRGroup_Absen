@@ -59,7 +59,7 @@ export default function Register() {
     "Marketing",
   ];
 
-  const images = ["/onboard.avif", "/onboard1.avif", "/onboard2.avif"];
+  const images = ["/hero2.webp", "/hero1.webp", "/gs.jpeg"];
   const [currentImage, setCurrentImage] = useState(0);
 
   useEffect(() => {
@@ -238,10 +238,10 @@ export default function Register() {
         ))}
 
         <div className="absolute bottom-4 left-4 lg:bottom-12 lg:left-14 text-white z-10">
-          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 animate-fade-in-up bg-linear-to-r from-white via-blue-100 to-orange-200 bg-clip-text text-transparent drop-shadow-lg">
             HRGroup Management
           </h1>
-          <p className="text-sm sm:text-base md:text-lg opacity-90">
+          <p className="text-sm sm:text-base md:text-lg opacity-90 animate-fade-in-up-delay backdrop-blur-sm bg-black/20 px-3 py-1 rounded-lg inline-block">
             Portal Pendaftaran Peserta
           </p>
         </div>
