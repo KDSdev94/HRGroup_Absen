@@ -33,83 +33,169 @@ export default function DashboardEmployee() {
       let employeeId: string | null = null;
       let employeeInfo: any = null;
 
+      console.log(
+        "🔍 Starting employee data fetch for user:",
+        auth.currentUser.uid
+      );
+      console.log("📧 User email:", auth.currentUser.email);
+
       // Try to get employeeId from the users collection
       try {
         const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        console.log("👤 User doc exists:", userDoc.exists());
         if (userDoc.exists()) {
           const userData = userDoc.data();
+          console.log("📄 User data from users collection:", userData);
           employeeId = userData.employeeId || userDoc.id;
           employeeInfo = userData;
+          console.log("✅ Got employeeId from users collection:", employeeId);
+          console.log("✅ Employee info from users:", {
+            name: employeeInfo?.name,
+            division: employeeInfo?.division,
+          });
         }
       } catch (error) {
-        console.log("User profile not found in users collection:", error);
+        console.log("❌ User profile not found in users collection:", error);
       }
 
       // If not found in users, try to find employee document with matching UID
       if (!employeeId) {
+        console.log("🔄 Trying employees collection by UID...");
         try {
           const empDoc = await getDoc(
             doc(db, "employees", auth.currentUser.uid)
           );
+          console.log("👥 Employee doc exists (by UID):", empDoc.exists());
           if (empDoc.exists()) {
             employeeId = empDoc.id;
-            employeeInfo = empDoc.data();
+            const empData = empDoc.data();
+            console.log("📄 Employee data (by UID):", empData);
+            // Merge employee data with user data
+            employeeInfo = { ...employeeInfo, ...empData };
+            console.log("✅ Merged employee info:", {
+              name: employeeInfo?.name,
+              division: employeeInfo?.division,
+            });
           }
         } catch (error) {
-          console.log("Employee doc not found in employees collection:", error);
+          console.log(
+            "❌ Employee doc not found in employees collection:",
+            error
+          );
         }
       }
 
       // If still not found, query employees collection where uid matches
       if (!employeeId) {
+        console.log("🔄 Trying employees query by uid field...");
         try {
           const empQuery = query(
             collection(db, "employees"),
             where("uid", "==", auth.currentUser.uid)
           );
           const empSnapshot = await getDocs(empQuery);
+          console.log(
+            "👥 Employee query results:",
+            empSnapshot.size,
+            "documents"
+          );
           if (!empSnapshot.empty) {
             employeeId = empSnapshot.docs[0].id;
-            employeeInfo = empSnapshot.docs[0].data();
+            const empData = empSnapshot.docs[0].data();
+            console.log("📄 Employee data (by query):", empData);
+            employeeInfo = { ...employeeInfo, ...empData };
+            console.log("✅ Merged employee info:", {
+              name: employeeInfo?.name,
+              division: employeeInfo?.division,
+            });
           }
         } catch (error) {
-          console.log("No employee found by UID query:", error);
+          console.log("❌ No employee found by UID query:", error);
         }
       }
 
       // If still no employeeId, try to get it from employee's document fields by email
       if (!employeeId) {
+        console.log("🔄 Trying employees query by email...");
         try {
           const empQuery = query(
             collection(db, "employees"),
             where("email", "==", auth.currentUser.email)
           );
           const empSnapshot = await getDocs(empQuery);
+          console.log(
+            "👥 Employee query by email results:",
+            empSnapshot.size,
+            "documents"
+          );
           if (!empSnapshot.empty) {
             employeeId = empSnapshot.docs[0].id;
-            employeeInfo = empSnapshot.docs[0].data();
+            const empData = empSnapshot.docs[0].data();
+            console.log("📄 Employee data (by email):", empData);
+            employeeInfo = { ...employeeInfo, ...empData };
+            console.log("✅ Merged employee info:", {
+              name: employeeInfo?.name,
+              division: employeeInfo?.division,
+            });
           }
         } catch (error) {
-          console.log("No employee found by email query:", error);
+          console.log("❌ No employee found by email query:", error);
         }
       }
 
       // If still no employeeId, use UID as fallback
       if (!employeeId) {
+        console.log("⚠️ Using UID as fallback employeeId");
         employeeId = auth.currentUser.uid;
       }
 
       // If we have employeeId but no employeeInfo, fetch it
       if (employeeId && !employeeInfo) {
+        console.log("🔄 Fetching employee info for employeeId:", employeeId);
         try {
           const empDoc = await getDoc(doc(db, "employees", employeeId));
+          console.log("👥 Employee doc exists (final fetch):", empDoc.exists());
           if (empDoc.exists()) {
-            employeeInfo = empDoc.data();
+            const empData = empDoc.data();
+            console.log("📄 Employee data (final fetch):", empData);
+            employeeInfo = empData;
           }
         } catch (error) {
-          console.log("Could not fetch employee info:", error);
+          console.log("❌ Could not fetch employee info:", error);
         }
       }
+
+      console.log("🎯 Final employeeId:", employeeId);
+      console.log("🎯 Final employeeInfo:", employeeInfo);
+
+      // If we have employeeId but missing name or division, try to get it from employees collection
+      if (employeeId && (!employeeInfo?.name || !employeeInfo?.division)) {
+        console.log(
+          "⚠️ Missing name or division, fetching from employees collection by employeeId:",
+          employeeId
+        );
+        try {
+          const empDoc = await getDoc(doc(db, "employees", employeeId));
+          console.log(
+            "👥 Employee doc exists (by employeeId):",
+            empDoc.exists()
+          );
+          if (empDoc.exists()) {
+            const empData = empDoc.data();
+            console.log("📄 Employee data (by employeeId):", empData);
+            // Merge with existing employeeInfo, prioritizing employee collection data
+            employeeInfo = { ...employeeInfo, ...empData };
+            console.log("✅ Updated employee info:", {
+              name: employeeInfo?.name,
+              division: employeeInfo?.division,
+            });
+          }
+        } catch (error) {
+          console.log("❌ Could not fetch employee by employeeId:", error);
+        }
+      }
+
+      console.log("🎯 FINAL employeeInfo after all checks:", employeeInfo);
 
       // STEP 2: Query attendance with the found employeeId
       const today = new Date().toISOString().split("T")[0];
@@ -206,7 +292,6 @@ export default function DashboardEmployee() {
       const stats = {
         name:
           employeeInfo?.name ||
-          employeeInfo?.displayName ||
           auth.currentUser.displayName ||
           auth.currentUser.email?.split("@")[0] ||
           "User",
@@ -216,6 +301,10 @@ export default function DashboardEmployee() {
         checkOutTime,
         isLate,
       };
+
+      console.log("📊 Final stats object:", stats);
+      console.log("👤 Name being used:", stats.name);
+      console.log("🏢 Division being used:", stats.division);
 
       setEmployeeStats(stats);
       setRecentAttendance(recentData);

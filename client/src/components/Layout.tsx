@@ -183,7 +183,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           ${isCollapsed ? "w-20" : "w-64"}
-          flex flex-col
+          flex flex-col relative
         `}
       >
         <div
@@ -191,12 +191,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             isCollapsed ? "px-2" : "px-6"
           } border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white dark:text-gray-900`}
         >
-          <div className="flex items-center overflow-hidden">
+          <div className="flex items-center justify-center overflow-hidden w-full">
             <img
-              src="/header.webp"
+              src={isCollapsed ? "/logo.png" : "/header.webp"}
               alt="HR Group Attendance"
               className={`transition-all duration-300 ${
-                isCollapsed ? "h-10" : "h-12"
+                isCollapsed ? "h-10 w-10" : "h-12"
               } object-contain`}
             />
           </div>
@@ -276,20 +276,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </TooltipProvider>
         </nav>
 
-        {/* Collapse Toggle Button (Desktop Only) */}
-        <div className="hidden lg:flex justify-end p-2 border-t border-gray-200 dark:border-gray-700">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="w-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
+        {/* Collapse Toggle Button - Floating in Center (Desktop Only) */}
+        <div className="hidden lg:block absolute top-1/2 -right-5 transform -translate-y-1/2 z-50">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsCollapsed(!isCollapsed)}
+                  className="h-8 w-8 rounded-full bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {isCollapsed ? "Buka Sidebar" : "Tutup Sidebar"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div

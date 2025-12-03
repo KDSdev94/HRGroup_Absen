@@ -1,5 +1,10 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import {
+  getAuth,
+  connectAuthEmulator,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
@@ -38,6 +43,11 @@ try {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+
+  // Set persistence for better mobile compatibility
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.warn("⚠️ Could not set auth persistence:", error);
+  });
 
   // Use emulators in development if available
   if (import.meta.env.DEV) {

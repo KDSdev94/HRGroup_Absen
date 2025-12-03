@@ -1,8 +1,15 @@
 import { useEffect, useState, useRef } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, AlertTriangle, RefreshCcw, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCcw,
+  Loader2,
+  Camera,
+  Upload,
+} from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
@@ -19,12 +26,17 @@ import { onAuthStateChanged } from "firebase/auth";
 
 export default function Scan() {
   const [scanResult, setScanResult] = useState<any | null>(null);
-  const [isScanning, setIsScanning] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(
     null
   );
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const [expectedAttendanceType, setExpectedAttendanceType] = useState<
+    "check-in" | "check-out" | null
+  >(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch logged-in user's employee ID
@@ -35,7 +47,9 @@ export default function Scan() {
           // 1. Try users collection
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists() && userDoc.data().employeeId) {
-            setCurrentEmployeeId(userDoc.data().employeeId);
+            const empId = userDoc.data().employeeId;
+            setCurrentEmployeeId(empId);
+            await checkTodayAttendance(empId);
             return;
           }
 
@@ -43,6 +57,7 @@ export default function Scan() {
           const empDoc = await getDoc(doc(db, "employees", user.uid));
           if (empDoc.exists()) {
             setCurrentEmployeeId(empDoc.id);
+            await checkTodayAttendance(empDoc.id);
             return;
           }
 
@@ -53,7 +68,9 @@ export default function Scan() {
           );
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
-            setCurrentEmployeeId(snapshot.docs[0].id);
+            const empId = snapshot.docs[0].id;
+            setCurrentEmployeeId(empId);
+            await checkTodayAttendance(empId);
           }
         } catch (error) {
           console.error("Error fetching employee ID:", error);
@@ -63,76 +80,128 @@ export default function Scan() {
     return () => unsubscribe();
   }, []);
 
+  // Check today's attendance to determine expected type
+  const checkTodayAttendance = async (employeeId: string) => {
+    try {
+      const today = new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Jakarta",
+      });
+      const dateString = new Date(today).toISOString().split("T")[0];
+
+      const checkInQuery = query(
+        collection(db, "attendance"),
+        where("employeeId", "==", employeeId),
+        where("date", "==", dateString),
+        where("type", "==", "check-in")
+      );
+      const checkInSnapshot = await getDocs(checkInQuery);
+
+      const checkOutQuery = query(
+        collection(db, "attendance"),
+        where("employeeId", "==", employeeId),
+        where("date", "==", dateString),
+        where("type", "==", "check-out")
+      );
+      const checkOutSnapshot = await getDocs(checkOutQuery);
+
+      if (checkInSnapshot.empty) {
+        setExpectedAttendanceType("check-in");
+      } else if (checkOutSnapshot.empty) {
+        setExpectedAttendanceType("check-out");
+      } else {
+        setExpectedAttendanceType(null); // Already done for today
+      }
+    } catch (error) {
+      console.error("Error checking attendance:", error);
+    }
+  };
+
+  // Initialize scanner instance
   useEffect(() => {
-    // Initialize scanner only if we are in scanning mode and haven't initialized yet
-    if (isScanning && !scannerRef.current) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(async () => {
-        try {
-          // Request camera permissions explicitly for mobile devices
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: { ideal: "environment" }, // Prefer rear camera on mobile
-              },
-            });
-            // Stop the stream immediately - we just needed to trigger permission
-            stream.getTracks().forEach((track) => track.stop());
-          } catch (permError) {
-            console.warn("Camera permission request:", permError);
-            toast({
-              variant: "destructive",
-              title: "Izin Kamera Diperlukan",
-              description:
-                "Mohon izinkan akses kamera untuk melakukan scan QR code. Periksa pengaturan browser Anda.",
-            });
-            return;
-          }
-
-          const scanner = new Html5QrcodeScanner(
-            "reader",
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-              aspectRatio: 1.0,
-              // Mobile-friendly camera constraints
-              disableFlip: false,
-              // Explicitly request environment-facing (rear) camera for mobile
-              videoConstraints: {
-                facingMode: { ideal: "environment" },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              },
-              // Support for different camera types
-              supportedScanTypes: [],
-            },
-            /* verbose= */ false
-          );
-
-          scanner.render(onScanSuccess, onScanFailure);
-          scannerRef.current = scanner;
-        } catch (error) {
-          console.error("Failed to initialize scanner:", error);
-          toast({
-            variant: "destructive",
-            title: "Error Kamera",
-            description:
-              "Tidak dapat mengakses kamera. Pastikan Anda menggunakan HTTPS dan telah memberikan izin kamera.",
-          });
-        }
-      }, 100);
-
-      return () => clearTimeout(timer);
+    if (!scannerRef.current) {
+      scannerRef.current = new Html5Qrcode("reader");
     }
 
-    // Cleanup function
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
+      // Cleanup on unmount
+      if (scannerRef.current && isCameraActive) {
+        scannerRef.current.stop().catch(console.error);
       }
     };
-  }, [isScanning, toast, currentEmployeeId]);
+  }, []);
+
+  // Start camera scanning
+  const startScanning = async () => {
+    if (!scannerRef.current || isCameraActive) return;
+
+    try {
+      // Request camera permissions
+      await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+      });
+
+      await scannerRef.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        onScanSuccess,
+        onScanFailure
+      );
+
+      setIsCameraActive(true);
+      setIsScanning(true);
+    } catch (error: any) {
+      console.error("Failed to start scanner:", error);
+      toast({
+        variant: "destructive",
+        title: "Error Kamera",
+        description:
+          "Tidak dapat mengakses kamera. Pastikan Anda telah memberikan izin kamera.",
+      });
+    }
+  };
+
+  // Stop camera scanning
+  const stopScanning = async () => {
+    if (!scannerRef.current || !isCameraActive) return;
+
+    try {
+      await scannerRef.current.stop();
+      setIsCameraActive(false);
+      setIsScanning(false);
+    } catch (error) {
+      console.error("Failed to stop scanner:", error);
+    }
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !scannerRef.current) return;
+
+    try {
+      setProcessing(true);
+      const result = await scannerRef.current.scanFile(file, false);
+      await onScanSuccess(result, null);
+    } catch (error: any) {
+      console.error("File scan error:", error);
+      toast({
+        variant: "destructive",
+        title: "Scan Gagal",
+        description: "Tidak dapat membaca QR code dari file.",
+      });
+    } finally {
+      setProcessing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   // Helper to get current time in WIB
   const getWIBTime = () => {
@@ -159,11 +228,9 @@ export default function Scan() {
     if (processing) return;
 
     // Stop scanning temporarily
-    if (scannerRef.current) {
-      scannerRef.current.clear();
-      scannerRef.current = null;
+    if (isCameraActive) {
+      await stopScanning();
     }
-    setIsScanning(false);
     setProcessing(true);
 
     try {
@@ -204,46 +271,11 @@ export default function Scan() {
         throw new Error("Absensi libur pada tanggal merah.");
       }
 
-      // 3. Check Operating Hours
-      let startTime = 8.0; // 08:00 WIB
-      let endTime = 16.0; // 16:00 WIB
-
-      if (day === 6) {
-        // Saturday
-        endTime = 12.0; // 12:00 WIB
-      }
-
-      console.log(`🕒 Operating Hours: ${startTime}:00 - ${endTime}:00`);
-
-      if (currentTime < startTime) {
-        throw new Error(`Absensi belum dibuka. Dimulai pukul 08:00 WIB.`);
-      }
-
-      if (currentTime > endTime) {
-        throw new Error(
-          `Absensi sudah ditutup. Berakhir pukul ${
-            day === 6 ? "12:00" : "16:00"
-          } WIB.`
-        );
-      }
-
-      // Get Location with high accuracy
-      const location = await new Promise<GeolocationPosition>(
-        (resolve, reject) => {
-          if (!navigator.geolocation) {
-            reject(new Error("Geolocation is not supported by your browser"));
-          } else {
-            // Request high accuracy location with timeout
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true, // Use GPS if available
-              timeout: 10000, // 10 second timeout
-              maximumAge: 0, // Don't use cached position
-            });
-          }
-        }
-      );
-
-      const { latitude, longitude } = location.coords;
+      // 3. Define flexible time windows
+      const CHECK_IN_START = 7.5; // 07:30
+      const CHECK_IN_END = 11.5; // 11:30
+      const CHECK_OUT_START = 15 + 55 / 60; // 15:55
+      const CHECK_OUT_END = 18.0; // 18:00
 
       // Check if employee has already checked in today
       const checkInQuery = query(
@@ -266,23 +298,55 @@ export default function Scan() {
       let attendanceType = "check-in";
       let successMessage = `Welcome, ${data.name}! Check-in recorded.`;
 
-      // Logic:
-      // - If no check-in -> Check-in
-      // - If check-in exists but no check-out -> Check-out
-      // - If check-out exists -> Error (Already done)
-
+      // Determine what type of attendance is allowed based on time and existing records
       if (checkInSnapshot.empty) {
-        // First scan of the day: Check-in
+        // No check-in yet - must be check-in time
+        if (currentTime < CHECK_IN_START) {
+          throw new Error(`Absen masuk belum dibuka. Dimulai pukul 07:30 WIB.`);
+        }
+        if (currentTime > CHECK_IN_END) {
+          throw new Error(
+            `Absen masuk sudah ditutup. Berakhir pukul 11:30 WIB.`
+          );
+        }
         attendanceType = "check-in";
         successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
       } else if (checkOutSnapshot.empty) {
-        // Second scan of the day: Check-out
+        // Check-in exists, no check-out yet - must be check-out time
+        if (currentTime < CHECK_OUT_START) {
+          throw new Error(
+            `Absen pulang belum dibuka. Dimulai pukul 15:55 WIB.`
+          );
+        }
+        if (currentTime > CHECK_OUT_END) {
+          throw new Error(
+            `Absen pulang sudah ditutup. Berakhir pukul 18:00 WIB.`
+          );
+        }
         attendanceType = "check-out";
         successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
       } else {
         // Already checked out
         throw new Error("Anda sudah melakukan absen pulang hari ini.");
       }
+
+      // Get Location with high accuracy
+      const location = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error("Geolocation is not supported by your browser"));
+          } else {
+            // Request high accuracy location with timeout
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true, // Use GPS if available
+              timeout: 10000, // 10 second timeout
+              maximumAge: 0, // Don't use cached position
+            });
+          }
+        }
+      );
+
+      const { latitude, longitude } = location.coords;
 
       // Update scan result to include attendance type
       setScanResult({
@@ -362,7 +426,11 @@ export default function Scan() {
 
   const resetScan = () => {
     setScanResult(null);
-    setIsScanning(true);
+    setIsScanning(false);
+    // Refresh attendance status
+    if (currentEmployeeId) {
+      checkTodayAttendance(currentEmployeeId);
+    }
   };
 
   return (
@@ -379,26 +447,140 @@ export default function Scan() {
 
       <Card className="overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-xl">
         <CardContent className="p-0">
-          {isScanning ? (
+          {!scanResult ? (
             <div className="bg-black relative min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center text-white p-3 md:p-4">
+              {/* Scanner Container */}
               <div
                 id="reader"
-                className="w-full rounded-lg overflow-hidden"
+                className={`w-full rounded-lg overflow-hidden ${
+                  isCameraActive ? "" : "hidden"
+                }`}
               ></div>
-              <p className="text-xs md:text-sm text-gray-400 mt-3 text-center">
-                💡 Pastikan pencahayaan cukup
-              </p>
-            </div>
-          ) : (
-            <div className="min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center p-4 md:p-8 text-center space-y-4 md:space-y-6 bg-linear-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-900/50 dark:to-gray-800/30">
-              {processing ? (
+
+              {/* Controls - Show when camera is not active */}
+              {!isCameraActive && !processing && (
+                <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+                  {/* Status Badge */}
+                  {expectedAttendanceType && (
+                    <div
+                      className={`px-4 py-2 rounded-full text-sm font-semibold mb-2 ${
+                        expectedAttendanceType === "check-in"
+                          ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                          : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                      }`}
+                    >
+                      {expectedAttendanceType === "check-in"
+                        ? "🌅 Absen Masuk"
+                        : "🌆 Absen Pulang"}
+                    </div>
+                  )}
+
+                  {expectedAttendanceType === null && (
+                    <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                      ✅ Absen Hari Ini Sudah Selesai
+                    </div>
+                  )}
+
+                  <div
+                    className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 ${
+                      expectedAttendanceType === "check-in"
+                        ? "bg-green-500/20"
+                        : expectedAttendanceType === "check-out"
+                        ? "bg-orange-500/20"
+                        : "bg-gray-500/20"
+                    }`}
+                  >
+                    <Camera
+                      className={`w-10 h-10 ${
+                        expectedAttendanceType === "check-in"
+                          ? "text-green-400"
+                          : expectedAttendanceType === "check-out"
+                          ? "text-orange-400"
+                          : "text-gray-400"
+                      }`}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={startScanning}
+                    size="lg"
+                    className={`w-full text-base font-semibold ${
+                      expectedAttendanceType === "check-in"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : expectedAttendanceType === "check-out"
+                        ? "bg-orange-600 hover:bg-orange-700"
+                        : ""
+                    }`}
+                    disabled={expectedAttendanceType === null}
+                  >
+                    <Camera className="mr-2 h-5 w-5" />
+                    {expectedAttendanceType === "check-in"
+                      ? "Scan Absen Masuk"
+                      : expectedAttendanceType === "check-out"
+                      ? "Scan Absen Pulang"
+                      : "Scan"}
+                  </Button>
+
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="flex-1 h-px bg-gray-700"></div>
+                    <span className="text-xs text-gray-400">ATAU</span>
+                    <div className="flex-1 h-px bg-gray-700"></div>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="qr-file-input"
+                  />
+                  <label
+                    htmlFor="qr-file-input"
+                    className="w-full cursor-pointer"
+                  >
+                    <div className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-secondary hover:bg-accent text-foreground rounded-lg font-semibold transition-all border-2 border-border">
+                      <Upload className="h-5 w-5" />
+                      Upload QR Code
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Processing State */}
+              {processing && (
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-primary" />
-                  <p className="text-base md:text-lg font-medium text-gray-600 dark:text-gray-300">
+                  <p className="text-base md:text-lg font-medium text-gray-300">
                     Memproses...
                   </p>
                 </div>
-              ) : scanResult?.error ? (
+              )}
+
+              {/* Camera Active - Show Stop Button */}
+              {isCameraActive && !processing && (
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                  <Button
+                    onClick={stopScanning}
+                    variant="destructive"
+                    size="lg"
+                    className="shadow-lg"
+                  >
+                    Stop Scan
+                  </Button>
+                </div>
+              )}
+
+              {/* Hint Text */}
+              {isCameraActive && !processing && (
+                <p className="text-xs md:text-sm text-gray-400 mt-3 text-center absolute top-4">
+                  💡 Pastikan pencahayaan cukup
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center p-4 md:p-8 text-center space-y-4 md:space-y-6 bg-linear-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-900/50 dark:to-gray-800/30">
+              {scanResult?.error ? (
                 <>
                   <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 animate-in zoom-in duration-300">
                     <AlertTriangle className="h-8 w-8 md:h-10 md:w-10" />

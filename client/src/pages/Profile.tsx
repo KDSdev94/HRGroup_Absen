@@ -78,33 +78,48 @@ export default function Profile() {
         return;
       }
 
+      console.log("🔍 [Profile] Fetching profile for user:", currentUser.uid);
+      console.log("📧 [Profile] User email:", currentUser.email);
+
       // Try to get user profile from users collection
       let profileData = null;
       try {
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        console.log("👤 [Profile] User doc exists:", userDoc.exists());
         if (userDoc.exists()) {
           profileData = userDoc.data();
+          console.log(
+            "📄 [Profile] User data from users collection:",
+            profileData
+          );
         }
       } catch (error) {
         console.log(
-          "No profile in users collection, checking employees...",
+          "❌ [Profile] No profile in users collection, checking employees...",
           error
         );
       }
 
       // If no profile in users, try employees collection using UID as doc ID
       if (!profileData) {
+        console.log("🔄 [Profile] Trying employees collection by UID...");
         try {
           const empDoc = await getDoc(doc(db, "employees", currentUser.uid));
+          console.log(
+            "👥 [Profile] Employee doc exists (by UID):",
+            empDoc.exists()
+          );
           if (empDoc.exists()) {
+            const empData = empDoc.data();
+            console.log("📄 [Profile] Employee data (by UID):", empData);
             profileData = {
-              ...empDoc.data(),
+              ...empData,
               employeeId: empDoc.id,
             };
           }
         } catch (error) {
           console.log(
-            "No profile in employees collection with UID as doc ID",
+            "❌ [Profile] No profile in employees collection with UID as doc ID",
             error
           );
         }
@@ -112,38 +127,91 @@ export default function Profile() {
 
       // If still no profile, try to find employee with matching UID field
       if (!profileData) {
+        console.log("🔄 [Profile] Trying employees query by uid field...");
         try {
           const empQuery = query(
             collection(db, "employees"),
             where("uid", "==", currentUser.uid)
           );
           const empSnapshot = await getDocs(empQuery);
+          console.log(
+            "👥 [Profile] Employee query results:",
+            empSnapshot.size,
+            "documents"
+          );
           if (!empSnapshot.empty) {
             const empDoc = empSnapshot.docs[0];
+            const empData = empDoc.data();
+            console.log("📄 [Profile] Employee data (by query):", empData);
             profileData = {
-              ...empDoc.data(),
+              ...empData,
               employeeId: empDoc.id,
             };
           }
         } catch (error) {
           console.log(
-            "No profile in employees collection with matching UID field",
+            "❌ [Profile] No profile in employees collection with matching UID field",
             error
           );
         }
       }
 
+      console.log("🎯 [Profile] Final profileData:", profileData);
+
+      // If we have employeeId but missing name or division, try to get it from employees collection
+      if (
+        profileData?.employeeId &&
+        (!profileData?.name || !profileData?.division)
+      ) {
+        console.log(
+          "⚠️ [Profile] Missing name or division, fetching from employees collection by employeeId:",
+          profileData.employeeId
+        );
+        try {
+          const empDoc = await getDoc(
+            doc(db, "employees", profileData.employeeId)
+          );
+          console.log(
+            "👥 [Profile] Employee doc exists (by employeeId):",
+            empDoc.exists()
+          );
+          if (empDoc.exists()) {
+            const empData = empDoc.data();
+            console.log("📄 [Profile] Employee data (by employeeId):", empData);
+            // Merge with existing profileData, prioritizing employee collection data
+            profileData = { ...profileData, ...empData };
+            console.log("✅ [Profile] Updated profile data:", {
+              name: profileData?.name,
+              division: profileData?.division,
+            });
+          }
+        } catch (error) {
+          console.log(
+            "❌ [Profile] Could not fetch employee by employeeId:",
+            error
+          );
+        }
+      }
+
+      console.log(
+        "🎯 [Profile] FINAL profileData after all checks:",
+        profileData
+      );
+
       if (profileData) {
-        setUserProfile({
+        const profile = {
           name: profileData.name || currentUser.displayName || "",
           email: profileData.email || currentUser.email || "",
           employeeId: profileData.employeeId || "",
           division: profileData.division || "",
           phone: profileData.phone || "",
           address: profileData.address || "",
-        });
+        };
+        console.log("📊 [Profile] Setting user profile:", profile);
+        setUserProfile(profile);
       } else {
         // If no profile exists, create a basic one from auth data
+        console.log("⚠️ [Profile] No profile data found, using auth data");
         setUserProfile({
           name: currentUser.displayName || "",
           email: currentUser.email || "",
@@ -154,7 +222,7 @@ export default function Profile() {
         });
       }
     } catch (error) {
-      console.error("Error fetching user profile:", error);
+      console.error("❌ [Profile] Error fetching user profile:", error);
       toast({
         title: "Error",
         description: "Failed to load user profile",

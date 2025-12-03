@@ -19,6 +19,7 @@ import EmployeeUsers from "@/pages/EmployeeUsers";
 import DataCleanup from "@/pages/DataCleanup";
 import Profile from "@/pages/Profile";
 import Layout from "@/components/Layout";
+import { UserProvider } from "./contexts/UserContext";
 
 function Router() {
   return (
@@ -84,12 +85,14 @@ function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="hrgroup-attendance-theme">
       <FirebaseErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </QueryClientProvider>
+        <UserProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </UserProvider>
       </FirebaseErrorBoundary>
     </ThemeProvider>
   );

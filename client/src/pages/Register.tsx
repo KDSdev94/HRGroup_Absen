@@ -119,6 +119,14 @@ export default function Register() {
     setIsLoading(true);
 
     try {
+      // Get employee data first
+      const selectedEmployee = employees.find(
+        (emp) => emp.id === selectedEmployeeId
+      );
+      if (!selectedEmployee) {
+        throw new Error("Employee data not found");
+      }
+
       // 1. Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -127,11 +135,13 @@ export default function Register() {
       );
       const user = userCredential.user;
 
-      // 2. Create User Profile
+      // 2. Create User Profile with complete employee data
       await setDoc(doc(db, "users", user.uid), {
         email,
         role: "employee",
         employeeId: selectedEmployeeId,
+        name: selectedEmployee.name,
+        division: selectedEmployee.division,
         createdAt: new Date().toISOString(),
       });
 
@@ -160,22 +170,56 @@ export default function Register() {
     }
   };
 
-  // REGISTER WITH GOOGLE
+  // REGISTER WITH GOOGLE - MODIFIED TO REQUIRE DIVISION AND NAME SELECTION FIRST
   const handleGoogleRegister = async () => {
+    if (!selectedEmployeeId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Silakan pilih divisi dan nama lengkap terlebih dahulu.",
+      });
+      return;
+    }
+
     try {
       const result = await signInWithPopup(auth, new GoogleAuthProvider());
       const user = result.user;
 
-      // For Google registration, we might need to handle employee selection differently
-      // For now, we'll prompt the user to select their employee profile
-      toast({
-        title: "Success",
-        description:
-          "Successfully authenticated with Google. Please complete your registration.",
+      // Get employee data based on selection
+      const selectedEmployee = employees.find(
+        (emp) => emp.id === selectedEmployeeId
+      );
+
+      if (!selectedEmployee) {
+        throw new Error("Employee data not found");
+      }
+
+      // Create User Profile with complete employee data
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        role: "employee",
+        employeeId: selectedEmployee.id,
+        name: selectedEmployee.name,
+        division: selectedEmployee.division,
+        createdAt: new Date().toISOString(),
       });
 
-      // We could redirect to a profile completion page or handle differently
-      // For now, keeping them on the register page to select employee
+      // Update employee doc to include user UID
+      const employeeRef = doc(db, "employees", selectedEmployeeId);
+      await updateDoc(employeeRef, {
+        uid: user.uid,
+        email: user.email,
+        lastLogin: new Date().toISOString(),
+        isActive: true,
+      });
+
+      toast({
+        title: "Registrasi Berhasil",
+        description: "Akun berhasil dibuat dengan Google.",
+      });
+
+      // Redirect to login page after successful registration
+      setLocation("/login");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -381,7 +425,8 @@ export default function Register() {
 
             <Button
               onClick={handleGoogleRegister}
-              className="w-full h-12 bg-white border text-black hover:bg-gray-100"
+              disabled={!selectedEmployeeId}
+              className={`w-full h-12 bg-white border text-black hover:bg-gray-100 ${!selectedEmployeeId ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <img src="/google.png" alt="g" className="h-5 mr-2" />
               Lanjutkan dengan Google

@@ -1,13 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import {
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
-  sendPasswordResetEmail,
-  confirmPasswordReset,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { useUser } from "@/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +16,7 @@ import {
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const { login, loginWithGoogle, forgotPassword, resetPassword } = useUser();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
@@ -75,7 +69,7 @@ export default function Login() {
 
     setIsConfirmingReset(true);
     try {
-      await confirmPasswordReset(auth, resetCode, newPassword);
+      await resetPassword(resetCode, newPassword);
       toast({
         title: "Sukses",
         description:
@@ -126,7 +120,7 @@ export default function Login() {
       // Send password reset email
       // Note: Firebase will use the authorized domains configured in Firebase Console
       // Make sure to add your deployment domain in Firebase Console > Authentication > Settings > Authorized domains
-      await sendPasswordResetEmail(auth, resetEmail);
+      await forgotPassword(resetEmail);
       console.log("Reset email sent successfully");
       toast({
         title: "Cek email Anda",
@@ -161,18 +155,38 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-
-      if (remember) localStorage.setItem("remember", email);
-      else localStorage.removeItem("remember");
+      await login(email, password, remember);
 
       toast({ title: "Berhasil", description: "Selamat datang kembali!" });
       setLocation("/");
     } catch (error: any) {
+      console.error("Login error:", error);
+
+      let errorMessage = "Email atau password salah.";
+
+      // Provide more specific error messages
+      if (error.code === "auth/user-not-found") {
+        errorMessage = "Akun tidak ditemukan. Periksa email Anda.";
+      } else if (error.code === "auth/wrong-password") {
+        errorMessage = "Password salah. Silakan coba lagi.";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Format email tidak valid.";
+      } else if (error.code === "auth/user-disabled") {
+        errorMessage = "Akun ini telah dinonaktifkan.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Terlalu banyak percobaan login. Coba lagi nanti.";
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Koneksi internet bermasalah. Periksa jaringan Anda.";
+      } else if (error.code === "auth/invalid-credential") {
+        errorMessage =
+          "Email atau password salah. Periksa kembali kredensial Anda.";
+      }
+
       toast({
         variant: "destructive",
         title: "Login Gagal",
-        description: error.message || "Email atau password salah.",
+        description: errorMessage,
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -181,7 +195,7 @@ export default function Login() {
 
   const handleGoogle = async () => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await loginWithGoogle();
       toast({
         title: "Berhasil",
         description: "Masuk dengan Google berhasil!",
