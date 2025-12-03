@@ -94,8 +94,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const { getRedirectResult } = await import("firebase/auth");
         console.log("🔐 Checking for redirect result from Google login...");
+        console.log("📱 Current auth state:", auth.currentUser ? "Authenticated" : "Not authenticated");
         
-        const result = await getRedirectResult(auth);
+        // Add timeout for getRedirectResult on slow mobile networks
+        const redirectPromise = getRedirectResult(auth);
+        const timeoutPromise = new Promise((resolve) =>
+          setTimeout(() => {
+            console.log("⚠️ Redirect result check timeout - continuing without result");
+            resolve(null);
+          }, 10000) // 10 seconds timeout
+        );
+        
+        const result = (await Promise.race([redirectPromise, timeoutPromise])) as any;
 
         if (result && result.user) {
           console.log("✅ Redirect result found for:", result.user.email);
@@ -118,13 +128,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
           
           // Dispatch custom event to notify Login page about successful redirect
           window.dispatchEvent(new Event("authRedirectComplete"));
+        } else {
+          console.log("ℹ️ No redirect result found (normal if not redirecting)");
         }
       } catch (error: any) {
         console.error("❌ Error handling redirect result:", error);
         console.error("Error code:", error.code);
-        // Check if it's an error we should propagate
-        if (error.code !== "auth/operation-not-supported-in-this-environment") {
-          // Don't throw - this is just checking for redirect result
+        console.error("Error message:", error.message);
+        
+        // Only log error if it's not a known "safe" error
+        if (error.code && error.code !== "auth/operation-not-supported-in-this-environment") {
+          console.error("⚠️ Redirect handling failed - user may need to login again");
         }
       }
     };
@@ -141,7 +155,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🔐 Attempting login for:", email);
 
-      // Add timeout protection for slow mobile networks
+      // Add timeout protection for slow mobile networks (45s for mobile)
       const loginPromise = signInWithEmailAndPassword(auth, email, password);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(
@@ -149,7 +163,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             reject(
               new Error("Login timeout - please check your internet connection")
             ),
-          30000
+          45000 // Increased to 45 seconds for slow mobile networks
         )
       );
 
@@ -207,9 +221,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // Import signInWithRedirect for mobile
         const { signInWithRedirect } = await import("firebase/auth");
 
-        // Start the redirect flow
+        // Start the redirect flow with timeout
         console.log("📱 Initiating Google Sign-In with redirect...");
-        await signInWithRedirect(auth, provider);
+        const redirectPromise = signInWithRedirect(auth, provider);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Google redirect timeout - please try again")),
+            45000 // 45 seconds for mobile
+          )
+        );
+        
+        await Promise.race([redirectPromise, timeoutPromise]);
         // This will redirect the page, so code below won't execute
         console.log("📱 Redirecting to Google...");
         return;
@@ -220,7 +242,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("Google login timeout - please try again")),
-            30000
+            45000 // Increased to 45 seconds
           )
         );
 

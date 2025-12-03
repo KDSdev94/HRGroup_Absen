@@ -233,8 +233,11 @@ export default function Login() {
     setIsLoading(true);
 
     try {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       console.log("🔐 Starting login process for:", email);
-      console.log("📱 Device: ", /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop");
+      console.log("📱 Device:", isMobile ? "Mobile" : "Desktop");
+      console.log("🌐 User Agent:", navigator.userAgent);
+      console.log("📏 Online status:", navigator.onLine);
       
       await login(email, password, remember);
 
@@ -273,6 +276,10 @@ export default function Login() {
           "Login timeout. Koneksi internet Anda mungkin lambat. Silakan coba lagi.";
       } else if (!isOnline) {
         errorMessage = "Koneksi internet terputus. Periksa jaringan Anda.";
+      } else if (error.code === "auth/internal-error") {
+        errorMessage = "Terjadi kesalahan internal. Coba refresh halaman dan login kembali.";
+      } else if (error.message && error.message.includes("CORS")) {
+        errorMessage = "Masalah koneksi. Pastikan domain sudah terdaftar di Firebase Console.";
       }
 
       toast({
@@ -299,8 +306,11 @@ export default function Login() {
 
     setIsLoading(true);
     try {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       console.log("🔐 Starting Google login...");
-      console.log("📱 Device: ", /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop");
+      console.log("📱 Device:", isMobile ? "Mobile" : "Desktop");
+      console.log("🌐 User Agent:", navigator.userAgent);
+      console.log("📏 Online status:", navigator.onLine);
       
       await loginWithGoogle();
 
@@ -331,6 +341,12 @@ export default function Login() {
         errorMessage = "Koneksi internet bermasalah. Periksa jaringan Anda.";
       } else if (!isOnline) {
         errorMessage = "Koneksi internet terputus. Periksa jaringan Anda.";
+      } else if (error.code === "auth/internal-error") {
+        errorMessage = "Terjadi kesalahan internal. Coba refresh halaman dan login kembali.";
+      } else if (error.message && error.message.includes("CORS")) {
+        errorMessage = "Masalah koneksi. Pastikan domain sudah terdaftar di Firebase Console.";
+      } else if (error.message && error.message.includes("redirect")) {
+        errorMessage = "Masalah redirect. Coba hapus cache browser dan coba lagi.";
       }
 
       toast({

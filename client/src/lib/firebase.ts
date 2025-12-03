@@ -44,10 +44,17 @@ try {
   db = getFirestore(app);
   storage = getStorage(app);
 
-  // Firebase Auth persistence is handled automatically by Firebase SDK
-  // No need to manually configure - it defaults to localStorage/indexedDB
-  console.log("✅ Firebase Auth initialized with default persistence");
-  console.log("📱 Auth will automatically persist to browser storage");
+  // Set persistence explicitly for better mobile support
+  // Use browserLocalPersistence to ensure it works on all devices
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("✅ Firebase Auth persistence set to LOCAL");
+      console.log("📱 Auth will persist across browser sessions");
+    })
+    .catch((error) => {
+      console.error("❌ Error setting auth persistence:", error);
+      console.error("⚠️ Auth may not persist on mobile devices");
+    });
 
   // Use emulators in development if available
   if (import.meta.env.DEV) {
