@@ -258,16 +258,24 @@ export default function DashboardAdmin() {
   };
 
   const StatCard = ({ title, value, icon: Icon, color, subtext }: any) => (
-    <Card className="border-l-4" style={{ borderLeftColor: color }}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-500">
+    <Card className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: color }}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6 pt-4 sm:pt-6">
+        <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 leading-tight">
           {title}
         </CardTitle>
-        <Icon className="h-4 w-4 text-gray-400" />
+        <div className="rounded-lg p-2 bg-gray-50 dark:bg-gray-800">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-400" />
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{loadingStats ? "..." : value}</div>
-        <p className="text-xs text-gray-500 mt-1">{subtext}</p>
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+        <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+          {loadingStats ? (
+            <span className="animate-pulse">...</span>
+          ) : (
+            value
+          )}
+        </div>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1.5 leading-tight">{subtext}</p>
       </CardContent>
     </Card>
   );
@@ -323,17 +331,17 @@ export default function DashboardAdmin() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+    <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-1 sm:space-y-2">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
           Dashboard Admin
         </h1>
-        <p className="text-gray-500 mt-2">
+        <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
           Overview statistik kehadiran dan aktivitas terbaru.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Peserta"
           value={stats.totalEmployees}
@@ -364,59 +372,67 @@ export default function DashboardAdmin() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-4 sm:gap-4 grid-cols-1 lg:grid-cols-7">
         {/* Recent Activity */}
-        <Card className="col-span-4 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-gray-600" />
-              <CardTitle>Aktivitas Terbaru</CardTitle>
+        <Card className="lg:col-span-4 shadow-sm border-t-2 border-t-primary/20">
+          <CardHeader className="px-5 sm:px-6 py-5 sm:py-6">
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-lg p-2 bg-primary/10">
+                <Activity className="h-5 w-5 text-primary" />
+              </div>
+              <CardTitle className="text-lg sm:text-xl font-bold">Aktivitas Terbaru</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6">
             {loadingStats ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="h-16 bg-gray-200 rounded animate-pulse"
+                    className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
                   />
                 ))}
               </div>
             ) : activities.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center py-8">
-                Belum ada aktivitas terbaru.
+              <div className="text-sm text-gray-500 text-center py-8 sm:py-12">
+                <Activity className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>Belum ada aktivitas terbaru.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3.5 sm:space-y-4">
                 {activities.map((activity) => (
                   <div
                     key={activity.id}
-                    className="flex items-start gap-4 pb-4 border-b last:border-b-0 last:pb-0"
+                    className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
-                    <div className="mt-1">
-                      <TrendingUp className="h-4 w-4 text-gray-400" />
+                    <div className="mt-0.5 hidden sm:block">
+                      <div className="rounded-full p-2 bg-white dark:bg-gray-700 shadow-sm">
+                        <TrendingUp className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">
                             {activity.employeeName}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {activity.division && `${activity.division} • `}
-                            {formatTimestamp(activity.timestamp)}
+                          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                            {activity.division && (
+                              <span className="font-medium">{activity.division}</span>
+                            )}
+                            {activity.division && " • "}
+                            <span>{formatTimestamp(activity.timestamp)}</span>
                           </p>
                         </div>
                         <span
-                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${getActivityTypeColor(
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap self-start ${getActivityTypeColor(
                             activity.type
                           )}`}
                         >
                           {getActivityTypeLabel(activity.type)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {activity.action}
                       </p>
                     </div>
@@ -428,22 +444,25 @@ export default function DashboardAdmin() {
         </Card>
 
         {/* Division Overview - Pie Chart */}
-        <Card className="col-span-3 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-gray-600" />
-              <CardTitle>Overview Per Divisi</CardTitle>
+        <Card className="lg:col-span-3 shadow-sm border-t-2 border-t-blue-500/20">
+          <CardHeader className="px-5 sm:px-6 py-5 sm:py-6">
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-lg p-2 bg-blue-500/10">
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+              </div>
+              <CardTitle className="text-lg sm:text-xl font-bold">Overview Per Divisi</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6">
             {loadingStats ? (
-              <div className="h-64 bg-gray-200 rounded animate-pulse" />
+              <div className="h-64 sm:h-72 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
             ) : divisionData.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center py-8">
-                Tidak ada data divisi.
+              <div className="text-sm text-gray-500 text-center py-8 sm:py-12">
+                <TrendingUp className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>Tidak ada data divisi.</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 280 : 320}>
                 <PieChart>
                   <Pie
                     data={divisionData}

@@ -16,16 +16,29 @@ Login gagal di mobile device (Android/iOS) meskipun email dan password benar. De
 - ✅ Timeout untuk Google login redirect: 45s
 - ✅ Timeout untuk Google login popup: 45s
 
-### 3. **Better Error Handling** (`client/src/pages/Login.tsx`)
+### 3. **DNS/Network Retry Logic** (`client/src/contexts/UserContext.tsx`) ✨ NEW
+- ✅ Retry otomatis hingga 3x untuk DNS/network errors
+- ✅ Delay 2 detik antar retry untuk DNS resolution
+- ✅ Mendeteksi error DNS, network, dan fetch failures
+- ✅ **Mengatasi masalah login saat menggunakan custom DNS**
+
+### 4. **Better Error Handling** (`client/src/pages/Login.tsx`)
 - ✅ Menambahkan error handling untuk `auth/internal-error`
 - ✅ Menambahkan error handling untuk CORS issues
 - ✅ Menambahkan error handling untuk redirect issues
 - ✅ Logging lebih detail (User Agent, Online status)
 
-### 4. **Redirect Handling Improvement** (`client/src/contexts/UserContext.tsx`)
+### 5. **Redirect Handling Improvement** (`client/src/contexts/UserContext.tsx`)
 - ✅ Menambahkan timeout 10 detik untuk `getRedirectResult()`
 - ✅ Better logging untuk redirect state
 - ✅ Menangani edge case saat redirect terlalu lama
+
+### 6. **Responsive Dashboard UI** ✨ NEW
+- ✅ Dashboard Admin responsive di mobile (grid 2 kolom untuk stats)
+- ✅ Dashboard Employee responsive di mobile
+- ✅ Sidebar tidak berantakan di mobile (width fixed 256px di mobile)
+- ✅ Cards, buttons, dan typography menyesuaikan ukuran layar
+- ✅ Touch-friendly spacing dan padding di mobile
 
 ## Langkah-langkah Firebase Console (PENTING!)
 

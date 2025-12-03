@@ -155,23 +155,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🔐 Attempting login for:", email);
 
-      // Add timeout protection for slow mobile networks (45s for mobile)
-      const loginPromise = signInWithEmailAndPassword(auth, email, password);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error("Login timeout - please check your internet connection")
-            ),
-          45000 // Increased to 45 seconds for slow mobile networks
-        )
-      );
+      // Retry logic for DNS/network issues
+      let lastError: any = null;
+      let attempt = 0;
+      const maxAttempts = 3;
 
-      const result = (await Promise.race([
-        loginPromise,
-        timeoutPromise,
-      ])) as any;
-      const user = result.user;
+      while (attempt < maxAttempts) {
+        attempt++;
+        console.log(`🔄 Login attempt ${attempt}/${maxAttempts}`);
+        
+        try {
+          // Add timeout protection for slow mobile networks (45s for mobile)
+          const loginPromise = signInWithEmailAndPassword(auth, email, password);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error("Login timeout - please check your internet connection")
+                ),
+              45000 // Increased to 45 seconds for slow mobile networks
+            )
+          );
+
+          const result = (await Promise.race([
+            loginPromise,
+            timeoutPromise,
+          ])) as any;
+          const user = result.user;
 
       console.log("✅ Login successful for:", user.email);
 
@@ -192,9 +202,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
       };
       setCurrentUser(userData);
 
-      console.log("✅ User data set with role:", role);
+          console.log("✅ User data set with role:", role);
+          return; // Success, exit retry loop
+        } catch (error: any) {
+          lastError = error;
+          console.error(`❌ Login attempt ${attempt} failed:`, error.code, error.message);
+          
+          // If it's a DNS or network error, retry
+          if (
+            error.code === "auth/network-request-failed" ||
+            error.message?.toLowerCase().includes("dns") ||
+            error.message?.toLowerCase().includes("network") ||
+            error.message?.toLowerCase().includes("fetch")
+          ) {
+            if (attempt < maxAttempts) {
+              console.log(`⏳ Waiting 2 seconds before retry...`);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              continue;
+            }
+          }
+          
+          // For other errors, don't retry
+          throw error;
+        }
+      }
+      
+      // If all attempts failed, throw the last error
+      throw lastError;
     } catch (error: any) {
-      console.error("❌ Login error:", error);
+      console.error("❌ Login error after all attempts:", error);
       console.error("Error code:", error.code);
       console.error("Error message:", error.message);
       throw error;

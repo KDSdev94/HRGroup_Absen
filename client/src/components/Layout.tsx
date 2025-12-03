@@ -164,7 +164,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 lg:flex">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
@@ -182,22 +182,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
-          ${isCollapsed ? "w-20" : "w-64"}
-          flex flex-col relative
+          ${isCollapsed ? "lg:w-20" : "lg:w-64"}
+          w-64
+          flex-col relative
+          hidden lg:flex
+          ${sidebarOpen ? "!flex" : ""}
         `}
       >
         <div
-          className={`h-16 flex items-center justify-between ${
-            isCollapsed ? "px-2" : "px-6"
-          } border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white dark:text-gray-900`}
+          className={`h-16 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white dark:text-gray-900 ${
+            isCollapsed ? "lg:px-2" : "lg:px-6"
+          } px-4`}
         >
           <div className="flex items-center justify-center overflow-hidden w-full">
             <img
               src={isCollapsed ? "/logo.png" : "/header.webp"}
               alt="HR Group Attendance"
-              className={`transition-all duration-300 ${
-                isCollapsed ? "h-10 w-10" : "h-12"
-              } object-contain`}
+              className={`transition-all duration-300 object-contain ${
+                isCollapsed ? "lg:h-10 lg:w-10 h-12" : "h-12"
+              }`}
             />
           </div>
 
@@ -232,7 +235,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
+        <nav className="p-2 sm:p-3 space-y-1 flex-1 overflow-y-auto">
           <TooltipProvider delayDuration={0}>
             {navItems.map((item) => {
               const isActive = location === item.href;
@@ -242,13 +245,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <Link href={item.href}>
                       <div
                         className={`
-                          flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer
+                          flex items-center gap-3 px-3 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer
                           ${
                             isActive
                               ? "bg-primary/10 text-primary"
                               : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50"
                           }
-                          ${isCollapsed ? "justify-center" : ""}
+                          ${isCollapsed ? "lg:justify-center" : ""}
                         `}
                         onClick={() => setSidebarOpen(false)}
                       >
@@ -259,7 +262,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         />
                         <span
                           className={`whitespace-nowrap transition-all duration-300 ${
-                            isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
+                            isCollapsed ? "lg:opacity-0 lg:w-0 lg:hidden" : "opacity-100"
                           }`}
                         >
                           {item.label}
@@ -302,38 +305,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div
-          className={`p-4 border-t border-gray-200 dark:border-gray-700 ${
-            isCollapsed ? "items-center" : ""
+          className={`p-3 sm:p-4 border-t border-gray-200 dark:border-gray-700 ${
+            isCollapsed ? "lg:items-center" : ""
           }`}
         >
-          {!isCollapsed && (
-            <div className="flex items-center gap-3 px-2 py-2 mb-2 animate-in fade-in duration-300">
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
-                {user?.email?.[0]?.toUpperCase() || "U"}
-              </div>
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
-                  {user?.email || "User"}
-                </p>
-                <p className="text-xs text-gray-500 truncate capitalize">
-                  {role || "Loading..."}
-                </p>
-              </div>
+          <div className={`flex items-center gap-3 px-2 py-2 mb-2 animate-in fade-in duration-300 ${
+            isCollapsed ? "lg:hidden" : ""
+          }`}>
+            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
+              {user?.email?.[0]?.toUpperCase() || "U"}
             </div>
-          )}
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
+                {user?.email || "User"}
+              </p>
+              <p className="text-xs text-gray-500 truncate capitalize">
+                {role || "Loading..."}
+              </p>
+            </div>
+          </div>
 
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`w-full ${
-                    isCollapsed ? "justify-center px-2" : "justify-start gap-2"
-                  } text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100 transition-all`}
+                  className={`w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100 transition-all ${
+                    isCollapsed ? "lg:justify-center lg:px-2 justify-start gap-2" : "justify-start gap-2"
+                  }`}
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 shrink-0" />
-                  {!isCollapsed && <span>Keluar</span>}
+                  <span className={isCollapsed ? "lg:hidden" : ""}> Keluar</span>
                 </Button>
               </TooltipTrigger>
               {isCollapsed && (
@@ -345,16 +348,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300">
-        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 lg:px-8 justify-between lg:justify-end sticky top-0 z-30">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300 w-full overflow-hidden">
+        <header className="h-14 sm:h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-3 sm:px-4 lg:px-8 justify-between lg:justify-end sticky top-0 z-30">
           <button
-            className="lg:hidden p-2 -ml-2 text-gray-600"
+            className="lg:hidden p-1.5 sm:p-2 -ml-1.5 sm:-ml-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
 
-          <div className="hidden lg:flex items-center gap-4 text-sm text-gray-500">
+          <div className="hidden lg:flex items-center gap-4 text-xs sm:text-sm text-gray-500">
             <span>
               {new Date().toLocaleDateString("id-ID", {
                 weekday: "long",
@@ -366,8 +369,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <main className="flex-1 p-3 sm:p-4 lg:p-8 overflow-y-auto">
+          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             {children}
           </div>
         </main>
