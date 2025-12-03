@@ -276,8 +276,8 @@ export default function DashboardAdmin() {
     const labels: { [key: string]: string } = {
       "check-in": "Check In",
       "check-out": "Check Out",
-      "add-employee": "Tambah Karyawan",
-      "edit-employee": "Edit Karyawan",
+      "add-employee": "Tambah Peserta",
+      "edit-employee": "Edit Peserta",
     };
     return labels[type] || type;
   };
@@ -335,7 +335,7 @@ export default function DashboardAdmin() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Karyawan"
+          title="Total Peserta"
           value={stats.totalEmployees}
           icon={Users}
           color="hsl(var(--primary))"

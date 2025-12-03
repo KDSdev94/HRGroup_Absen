@@ -50,6 +50,7 @@ interface Employee {
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterDivision, setFilterDivision] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -229,13 +230,18 @@ export default function Employees() {
     }
   };
 
-  const filteredEmployees = employees.filter(
-    (emp) =>
+  const filteredEmployees = employees.filter((emp) => {
+    const matchesSearch =
       emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.division.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      emp.division.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesDivision =
+      filterDivision === "all" || emp.division === filterDivision;
+
+    return matchesSearch && matchesDivision;
+  });
 
   const downloadQR = () => {
     const svg = document.getElementById("qr-code-svg");
@@ -388,14 +394,29 @@ export default function Employees() {
 
       <Card>
         <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Cari berdasarkan nama, ID Peserta, atau divisi..."
-              className="pl-8 max-w-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Cari berdasarkan nama, ID Peserta, atau divisi..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={filterDivision} onValueChange={setFilterDivision}>
+              <SelectTrigger className="w-full md:w-[250px]">
+                <SelectValue placeholder="Semua Divisi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Divisi</SelectItem>
+                {DIVISIONS.map((div) => (
+                  <SelectItem key={div} value={div}>
+                    {div}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>

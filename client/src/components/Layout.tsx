@@ -122,7 +122,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     },
     {
       icon: Users2,
-      label: "User Karyawan",
+      label: "User Peserta",
       href: "/employee-users",
       roles: ["superadmin"],
     },

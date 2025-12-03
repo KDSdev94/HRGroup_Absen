@@ -1,139 +1,172 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Trash2, Mail, User, Search, AlertTriangle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection,
-  getDocs,
-  doc,
-  updateDoc,
   query,
   where,
+  getDocs,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
+import { formatDateTable } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
-interface Employee {
+interface CleanupUser {
   id: string;
-  employeeId: string;
-  name: string;
-  division: string;
-  uid?: string;
-  email?: string;
-}
-
-interface User {
-  id: string;
-  employeeId: string;
+  uid: string;
   email: string;
+  employeeId?: string;
   role: string;
+  createdAt: any;
+  // Employee data
+  name?: string;
+  division?: string;
 }
 
 export default function DataCleanup() {
-  const [loading, setLoading] = useState(false);
-  const [orphanedEmployees, setOrphanedEmployees] = useState<Employee[]>([]);
-  const [scanning, setScanning] = useState(false);
+  const [cleanupUsers, setCleanupUsers] = useState<CleanupUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  const scanForOrphans = async () => {
-    setScanning(true);
+  useEffect(() => {
+    fetchCleanupUsers();
+  }, []);
+
+  const fetchCleanupUsers = async () => {
     try {
-      // Get all employees
-      const employeesSnapshot = await getDocs(collection(db, "employees"));
-      const employees = employeesSnapshot.docs.map((doc) => ({
+      setLoading(true);
+      // Query users collection where role is "employee"
+      const q = query(collection(db, "users"), where("role", "==", "employee"));
+      const querySnapshot = await getDocs(q);
+
+      const usersData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
+        uid: doc.id,
         ...doc.data(),
-      })) as Employee[];
+      })) as CleanupUser[];
 
-      // Get all users with role employee
-      const usersQuery = query(
-        collection(db, "users"),
-        where("role", "==", "employee")
-      );
-      const usersSnapshot = await getDocs(usersQuery);
-      const users = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as User[];
+      console.log("🔍 All employee users:", usersData);
 
-      // Find employees with uid/email but no corresponding user
-      const orphans = employees.filter((emp) => {
-        if (!emp.uid && !emp.email) return false; // Not registered, skip
+      // Filter users that DON'T have name or division
+      // These are users who registered with Google but didn't select division/name
+      const incompleteUsers = usersData.filter((user) => {
+        const hasNoName = !user.name || user.name === "";
+        const hasNoDivision = !user.division || user.division === "";
+        const hasNoEmployeeId = !user.employeeId || user.employeeId === "";
 
-        // Check if user exists
-        const userExists = users.some(
-          (user) => user.id === emp.uid || user.employeeId === emp.id
-        );
-
-        return !userExists; // Orphan if user doesn't exist
+        // User is incomplete if they lack name, division, or employeeId
+        return hasNoName || hasNoDivision || hasNoEmployeeId;
       });
 
-      setOrphanedEmployees(orphans);
+      console.log("🗑️ Incomplete users (cleanup needed):", incompleteUsers);
 
-      toast({
-        title: "Scan Selesai",
-        description: `Ditemukan ${orphans.length} karyawan dengan data tidak valid.`,
-      });
+      setCleanupUsers(incompleteUsers);
     } catch (error) {
-      console.error("Error scanning:", error);
+      console.error("Error fetching cleanup users:", error);
       toast({
         title: "Error",
-        description: "Gagal melakukan scan data",
-        variant: "destructive",
-      });
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const cleanupOrphans = async () => {
-    if (orphanedEmployees.length === 0) {
-      toast({
-        title: "Tidak Ada Data",
-        description: "Tidak ada data yang perlu dibersihkan.",
-      });
-      return;
-    }
-
-    if (
-      !confirm(
-        `Apakah Anda yakin ingin membersihkan ${orphanedEmployees.length} data karyawan?\n\nIni akan menghapus uid dan email dari karyawan yang tidak memiliki akun user.`
-      )
-    )
-      return;
-
-    setLoading(true);
-    try {
-      let cleaned = 0;
-
-      for (const emp of orphanedEmployees) {
-        const employeeRef = doc(db, "employees", emp.id);
-        await updateDoc(employeeRef, {
-          uid: null,
-          email: null,
-          isActive: false,
-          lastLogin: null,
-        });
-        cleaned++;
-      }
-
-      toast({
-        title: "Berhasil",
-        description: `${cleaned} data karyawan berhasil dibersihkan.`,
-      });
-
-      setOrphanedEmployees([]);
-    } catch (error) {
-      console.error("Error cleaning up:", error);
-      toast({
-        title: "Error",
-        description: "Gagal membersihkan data",
+        description: "Gagal memuat daftar user yang perlu dibersihkan",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (
+      !confirm(
+        `Apakah Anda yakin ingin menghapus akun ${email}?\n\nAkun ini tidak memiliki data lengkap (nama/divisi) dan akan dihapus permanen.`
+      )
+    )
+      return;
+
+    try {
+      // Delete from Firestore users collection
+      await deleteDoc(doc(db, "users", userId));
+
+      toast({
+        title: "Berhasil",
+        description: `Akun ${email} berhasil dihapus dari sistem.`,
+      });
+
+      fetchCleanupUsers();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menghapus akun user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (cleanupUsers.length === 0) {
+      toast({
+        title: "Info",
+        description: "Tidak ada data yang perlu dibersihkan",
+      });
+      return;
+    }
+
+    if (
+      !confirm(
+        `Apakah Anda yakin ingin menghapus SEMUA ${cleanupUsers.length} akun yang tidak lengkap?\n\nTindakan ini tidak dapat dibatalkan!`
+      )
+    )
+      return;
+
+    try {
+      setLoading(true);
+
+      // Delete all incomplete users
+      const deletePromises = cleanupUsers.map((user) =>
+        deleteDoc(doc(db, "users", user.id))
+      );
+
+      await Promise.all(deletePromises);
+
+      toast({
+        title: "Berhasil",
+        description: `${cleanupUsers.length} akun berhasil dihapus dari sistem.`,
+      });
+
+      fetchCleanupUsers();
+    } catch (error) {
+      console.error("Error bulk deleting users:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menghapus beberapa akun user",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredUsers = cleanupUsers.filter((user) => {
+    const matchesSearch =
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.division?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.employeeId?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    return matchesSearch;
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -142,113 +175,157 @@ export default function DataCleanup() {
           Pembersihan Data
         </h1>
         <p className="text-gray-500 mt-2">
-          Tool untuk membersihkan data karyawan yang tidak valid (memiliki
-          uid/email tapi tidak ada user account).
+          Kelola dan hapus akun user yang terdaftar dengan Google tetapi tidak
+          memiliki data lengkap (nama/divisi).
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Scan Data Karyawan</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Scan akan mencari karyawan yang memiliki field{" "}
-            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">
-              uid
-            </code>{" "}
-            atau{" "}
-            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">
-              email
-            </code>{" "}
-            tapi tidak memiliki akun user di sistem.
-          </p>
+      {/* Warning Alert */}
+      {cleanupUsers.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-amber-900 dark:text-amber-200">
+              Ditemukan {cleanupUsers.length} akun tidak lengkap
+            </h3>
+            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              Akun-akun ini terdaftar dengan Google tetapi tidak memiliki data
+              divisi atau nama lengkap. Disarankan untuk menghapus akun ini agar
+              database tetap bersih.
+            </p>
+          </div>
+        </div>
+      )}
 
+      {/* Search and Bulk Action Bar */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Cari berdasarkan email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {cleanupUsers.length > 0 && (
           <Button
-            onClick={scanForOrphans}
-            disabled={scanning}
+            onClick={handleBulkDelete}
+            variant="destructive"
             className="gap-2"
           >
-            {scanning ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Scanning...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Scan Data
-              </>
-            )}
+            <Trash2 className="h-4 w-4" />
+            Hapus Semua ({cleanupUsers.length})
           </Button>
+        )}
+      </div>
+
+      {/* Users Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Data User Tidak Lengkap ({filteredUsers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Memuat daftar user...</p>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 mb-4">
+                <svg
+                  className="w-8 h-8 text-green-600 dark:text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <p className="text-gray-900 dark:text-white font-semibold text-lg">
+                Database Bersih!
+              </p>
+              <p className="text-gray-500 mt-1">
+                {cleanupUsers.length === 0
+                  ? "Tidak ada user yang perlu dibersihkan."
+                  : "Tidak ada user yang cocok dengan pencarian."}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Nama</TableHead>
+                    <TableHead>Divisi</TableHead>
+                    <TableHead>ID Peserta</TableHead>
+                    <TableHead>Terdaftar</TableHead>
+                    <TableHead>Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-gray-400" />
+                          {user.email}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          {user.name || (
+                            <span className="text-red-500 italic">
+                              Tidak ada
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.division || (
+                          <span className="text-red-500 italic">Tidak ada</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.employeeId ? (
+                          <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                            {user.employeeId}
+                          </span>
+                        ) : (
+                          <span className="text-red-500 italic">Tidak ada</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        {formatDateTable(user.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id, user.email)}
+                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {orphanedEmployees.length > 0 && (
-        <Card className="border-orange-200 dark:border-orange-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
-              <AlertTriangle className="h-5 w-5" />
-              Data Tidak Valid Ditemukan ({orphanedEmployees.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-              <p className="text-sm text-orange-800 dark:text-orange-200 mb-3">
-                Karyawan berikut memiliki uid/email tapi tidak ada akun user:
-              </p>
-              <ul className="space-y-2">
-                {orphanedEmployees.map((emp) => (
-                  <li
-                    key={emp.id}
-                    className="text-sm bg-white dark:bg-gray-800 p-3 rounded border border-orange-100 dark:border-orange-900"
-                  >
-                    <div className="font-medium">{emp.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      ID: {emp.id} | Divisi: {emp.division}
-                      {emp.email && ` | Email: ${emp.email}`}
-                      {emp.uid && ` | UID: ${emp.uid}`}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <Button
-              onClick={cleanupOrphans}
-              disabled={loading}
-              variant="destructive"
-              className="gap-2"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Membersihkan...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Bersihkan Data ({orphanedEmployees.length})
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {!scanning && orphanedEmployees.length === 0 && (
-        <Card className="border-green-200 dark:border-green-800">
-          <CardContent className="py-8">
-            <div className="text-center text-green-600 dark:text-green-400">
-              <CheckCircle className="h-12 w-12 mx-auto mb-3" />
-              <p className="font-medium">Data Bersih</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Tidak ada data karyawan yang tidak valid.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

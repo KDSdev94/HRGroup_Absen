@@ -10,6 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Trash2, Mail, User, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -41,7 +48,20 @@ export default function EmployeeUsers() {
   const [employeeUsers, setEmployeeUsers] = useState<EmployeeUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterDivision, setFilterDivision] = useState("all");
   const { toast } = useToast();
+
+  const DIVISIONS = [
+    "Akuntansi & Keuangan",
+    "Teknik",
+    "HRD",
+    "Legal",
+    "Design Grafis",
+    "Marketing & Sosmed",
+    "Administrasi Pemberkasan",
+    "Content Creative",
+    "Marketing",
+  ];
 
   useEffect(() => {
     fetchEmployeeUsers();
@@ -84,12 +104,28 @@ export default function EmployeeUsers() {
         })
       );
 
-      setEmployeeUsers(enrichedData);
+      // Filter to only show users with COMPLETE data (name, division, employeeId)
+      const completeUsers = enrichedData.filter((user) => {
+        const hasName = user.name && user.name !== "";
+        const hasDivision = user.division && user.division !== "";
+        const hasEmployeeId = user.employeeId && user.employeeId !== "";
+
+        // Only show users with ALL required fields
+        return hasName && hasDivision && hasEmployeeId;
+      });
+
+      console.log("✅ Complete users:", completeUsers);
+      console.log(
+        "🗑️ Filtered out incomplete users:",
+        enrichedData.length - completeUsers.length
+      );
+
+      setEmployeeUsers(completeUsers);
     } catch (error) {
       console.error("Error fetching employee users:", error);
       toast({
         title: "Error",
-        description: "Gagal memuat daftar user karyawan",
+        description: "Gagal memuat daftar user peserta",
         variant: "destructive",
       });
     } finally {
@@ -107,7 +143,7 @@ export default function EmployeeUsers() {
       !confirm(
         `Apakah Anda yakin ingin menghapus akun ${
           name || email
-        }?\n\nKaryawan ini akan bisa mendaftar ulang setelah akun dihapus.`
+        }?\n\nPeserta ini akan bisa mendaftar ulang setelah akun dihapus.`
       )
     )
       return;
@@ -131,7 +167,7 @@ export default function EmployeeUsers() {
         title: "Berhasil",
         description: `Akun ${
           name || email
-        } berhasil dihapus. Karyawan dapat mendaftar ulang.`,
+        } berhasil dihapus. Peserta dapat mendaftar ulang.`,
       });
 
       fetchEmployeeUsers();
@@ -145,54 +181,72 @@ export default function EmployeeUsers() {
     }
   };
 
-  const filteredUsers = employeeUsers.filter(
-    (user) =>
+  const filteredUsers = employeeUsers.filter((user) => {
+    const matchesSearch =
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.division?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.employeeId?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      user.employeeId?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesDivision =
+      filterDivision === "all" || user.division === filterDivision;
+
+    return matchesSearch && matchesDivision;
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Kelola User Karyawan
+          Kelola User Peserta
         </h1>
         <p className="text-gray-500 mt-2">
-          Kelola akun user karyawan yang sudah terdaftar. Hapus akun untuk
-          memungkinkan karyawan mendaftar ulang.
+          Kelola akun user peserta yang sudah terdaftar. Hapus akun untuk
+          memungkinkan peserta mendaftar ulang.
         </p>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Cari berdasarkan nama, email, divisi, atau ID..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Cari berdasarkan nama, email, divisi, atau ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={filterDivision} onValueChange={setFilterDivision}>
+          <SelectTrigger className="w-full md:w-[250px]">
+            <SelectValue placeholder="Semua Divisi" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Divisi</SelectItem>
+            {DIVISIONS.map((div) => (
+              <SelectItem key={div} value={div}>
+                {div}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            User Karyawan Terdaftar ({filteredUsers.length})
-          </CardTitle>
+          <CardTitle>User Peserta Terdaftar ({filteredUsers.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">Memuat daftar user karyawan...</p>
+              <p className="text-gray-500">Memuat daftar user peserta...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">
                 {employeeUsers.length === 0
-                  ? "Tidak ada user karyawan terdaftar."
+                  ? "Tidak ada user peserta terdaftar."
                   : "Tidak ada user yang cocok dengan pencarian."}
               </p>
             </div>
@@ -203,7 +257,7 @@ export default function EmployeeUsers() {
                   <TableRow>
                     <TableHead>Nama</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>ID Karyawan</TableHead>
+                    <TableHead>ID Peserta</TableHead>
                     <TableHead>Divisi</TableHead>
                     <TableHead>Terdaftar</TableHead>
                     <TableHead>Aksi</TableHead>
