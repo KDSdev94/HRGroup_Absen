@@ -44,40 +44,10 @@ try {
   db = getFirestore(app);
   storage = getStorage(app);
 
-  // Set persistence for better mobile compatibility
-  // Try browserLocalPersistence first, fallback to indexedDB if needed
-  (async () => {
-    try {
-      console.log("🔐 Setting up Firebase auth persistence...");
-      await setPersistence(auth, browserLocalPersistence);
-      console.log("✅ Auth persistence set to browserLocalPersistence");
-    } catch (error: any) {
-      console.warn("⚠️ browserLocalPersistence failed:", error.code);
-      // Try indexedDB as fallback for mobile browsers
-      try {
-        const { indexedDBLocalPersistence } = await import("firebase/auth");
-        await setPersistence(auth, indexedDBLocalPersistence);
-        console.log(
-          "✅ Auth persistence set to indexedDBLocalPersistence (fallback)"
-        );
-      } catch (fallbackError: any) {
-        console.warn("⚠️ indexedDBLocalPersistence failed:", fallbackError.code);
-        // Try sessionStorage as last resort
-        try {
-          const { browserSessionPersistence } = await import("firebase/auth");
-          await setPersistence(auth, browserSessionPersistence);
-          console.log(
-            "✅ Auth persistence set to browserSessionPersistence (fallback)"
-          );
-        } catch (sessionError: any) {
-          console.error(
-            "❌ Could not set any persistence:",
-            sessionError.code
-          );
-        }
-      }
-    }
-  })();
+  // Firebase Auth persistence is handled automatically by Firebase SDK
+  // No need to manually configure - it defaults to localStorage/indexedDB
+  console.log("✅ Firebase Auth initialized with default persistence");
+  console.log("📱 Auth will automatically persist to browser storage");
 
   // Use emulators in development if available
   if (import.meta.env.DEV) {
