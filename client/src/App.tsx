@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import FirebaseErrorBoundary from "@/components/FirebaseErrorBoundary";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -26,14 +27,53 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
         <Route path="/" component={Dashboard} />
-        <Route path="/employees" component={Employees} />
-        <Route path="/employee-users" component={EmployeeUsers} />
-        <Route path="/data-cleanup" component={DataCleanup} />
-        <Route path="/scan" component={Scan} />
-        <Route path="/reports" component={Reports} />
-        <Route path="/attendance-history" component={AttendanceHistory} />
-        <Route path="/profile" component={Profile} />
-        <Route path="/admins" component={Admins} />
+
+        {/* Admin-only routes */}
+        <Route path="/employees">
+          <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
+            <Employees />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/reports">
+          <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
+            <Reports />
+          </ProtectedRoute>
+        </Route>
+
+        {/* Superadmin-only routes */}
+        <Route path="/admins">
+          <ProtectedRoute allowedRoles={["superadmin"]}>
+            <Admins />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/employee-users">
+          <ProtectedRoute allowedRoles={["superadmin"]}>
+            <EmployeeUsers />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/data-cleanup">
+          <ProtectedRoute allowedRoles={["superadmin"]}>
+            <DataCleanup />
+          </ProtectedRoute>
+        </Route>
+
+        {/* Employee-only routes */}
+        <Route path="/scan">
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <Scan />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/attendance-history">
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <AttendanceHistory />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/profile">
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <Profile />
+          </ProtectedRoute>
+        </Route>
+
         <Route component={NotFound} />
       </Switch>
     </Layout>

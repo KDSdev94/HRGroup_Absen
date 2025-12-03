@@ -17,8 +17,11 @@ export default function Dashboard() {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
             const userRole = userDoc.data().role;
+            // Only allow superadmin and admin to see admin dashboard
+            // All other roles default to employee dashboard
             setRole(userRole);
           } else {
+            // Fallback: only admin@hrgroup.com gets superadmin role, all others get employee
             if (currentUser.email === "admin@hrgroup.com") {
               setRole("superadmin");
             } else {
@@ -27,6 +30,7 @@ export default function Dashboard() {
           }
         } catch (error) {
           console.error("❌ Error fetching role:", error);
+          // On error, default to employee to prevent unauthorized access
           setRole("employee");
         }
       } else {
@@ -39,6 +43,7 @@ export default function Dashboard() {
   }, []);
 
   if (loading || role === null) {
+    // Show loading state while determining role
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="h-10 bg-gray-200 rounded animate-pulse" />
@@ -51,7 +56,15 @@ export default function Dashboard() {
     );
   }
 
-  // Route to appropriate dashboard based on role
-  // Employee role gets employee dashboard, everything else gets admin dashboard
-  return role === "employee" ? <DashboardEmployee /> : <DashboardAdmin />;
+  // Explicitly validate roles and ensure only authorized roles can access admin dashboard
+  // This prevents any potential bypass due to role name variations or errors
+  const isAdminRole = role === "superadmin" || role === "admin";
+
+  // Render the appropriate dashboard based on role
+  // This ensures employees can NEVER see the admin dashboard
+  return isAdminRole ? (
+    <DashboardAdmin />
+  ) : (
+    <DashboardEmployee />
+  );
 }
