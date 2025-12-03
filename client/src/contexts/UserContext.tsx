@@ -93,10 +93,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const handleRedirectResult = async () => {
       try {
         const { getRedirectResult } = await import("firebase/auth");
+        console.log("🔐 Checking for redirect result from Google login...");
+        
         const result = await getRedirectResult(auth);
 
         if (result && result.user) {
-          console.log("✅ Handling redirect result for:", result.user.email);
+          console.log("✅ Redirect result found for:", result.user.email);
 
           // Save email for "remember me" functionality
           if (result.user.email) {
@@ -113,10 +115,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
           };
           setCurrentUser(userData);
           console.log("✅ Redirect login complete with role:", role);
+          
+          // Dispatch custom event to notify Login page about successful redirect
+          window.dispatchEvent(new Event("authRedirectComplete"));
         }
       } catch (error: any) {
         console.error("❌ Error handling redirect result:", error);
-        // Don't throw - this is just checking for redirect result
+        console.error("Error code:", error.code);
+        // Check if it's an error we should propagate
+        if (error.code !== "auth/operation-not-supported-in-this-environment") {
+          // Don't throw - this is just checking for redirect result
+        }
       }
     };
 
@@ -188,32 +197,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // Add custom parameters for better mobile support
       provider.setCustomParameters({
         prompt: "select_account",
-        // Force mobile-friendly flow
-        display: "popup",
       });
 
       // For mobile devices, use redirect instead of popup
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-      let result;
       if (isMobile) {
         console.log("📱 Mobile detected - using redirect flow");
         // Import signInWithRedirect for mobile
-        const { signInWithRedirect, getRedirectResult } = await import(
-          "firebase/auth"
-        );
+        const { signInWithRedirect } = await import("firebase/auth");
 
-        // Check if we're returning from a redirect
-        const redirectResult = await getRedirectResult(auth);
-        if (redirectResult) {
-          result = redirectResult;
-          console.log("✅ Got redirect result");
-        } else {
-          // Start the redirect flow
-          await signInWithRedirect(auth, provider);
-          // This will redirect the page, so code below won't execute
-          return;
-        }
+        // Start the redirect flow
+        console.log("📱 Initiating Google Sign-In with redirect...");
+        await signInWithRedirect(auth, provider);
+        // This will redirect the page, so code below won't execute
+        console.log("📱 Redirecting to Google...");
+        return;
       } else {
         console.log("💻 Desktop detected - using popup flow");
         // Add timeout for popup
@@ -225,28 +224,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
           )
         );
 
-        result = (await Promise.race([popupPromise, timeoutPromise])) as any;
+        const result = (await Promise.race([
+          popupPromise,
+          timeoutPromise,
+        ])) as any;
+
+        const user = result.user;
+        console.log("✅ Google login successful for:", user.email);
+
+        // Save email for "remember me" functionality
+        if (user.email) {
+          localStorage.setItem("rememberEmail", user.email);
+        }
+
+        const role = await getUserRole(user.uid);
+        const userData: User = {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          role,
+        };
+        setCurrentUser(userData);
+
+        console.log("✅ Google user data set with role:", role);
       }
-
-      const user = result.user;
-      console.log("✅ Google login successful for:", user.email);
-
-      // Save email for "remember me" functionality
-      if (user.email) {
-        localStorage.setItem("rememberEmail", user.email);
-      }
-
-      const role = await getUserRole(user.uid);
-      const userData: User = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        role,
-      };
-      setCurrentUser(userData);
-
-      console.log("✅ Google user data set with role:", role);
     } catch (error: any) {
       console.error("❌ Google login error:", error);
       console.error("Error code:", error.code);

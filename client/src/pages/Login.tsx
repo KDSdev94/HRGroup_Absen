@@ -27,6 +27,7 @@ export default function Login() {
   const [showForgotDialog, setShowForgotDialog] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [isResetting, setIsResetting] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // PASSWORD RESET CONFIRMATION STATE
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
@@ -34,6 +35,32 @@ export default function Login() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+
+  // Check network connectivity
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log("📡 Network is online");
+      setIsOnline(true);
+    };
+
+    const handleOffline = () => {
+      console.log("❌ Network is offline");
+      setIsOnline(false);
+      toast({
+        variant: "destructive",
+        title: "Offline",
+        description: "Koneksi internet terputus. Periksa jaringan Anda.",
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [toast]);
 
   // Check for reset password code in URL
   useEffect(() => {
@@ -47,45 +74,26 @@ export default function Login() {
     }
   }, []);
 
-  // Handle Google redirect result for mobile devices
+  // Listen for redirect auth completion from UserContext
   useEffect(() => {
-    const checkRedirectResult = async () => {
-      try {
-        const { getRedirectResult } = await import("firebase/auth");
-        const { auth } = await import("@/lib/firebase");
-
-        setIsLoading(true);
-        const result = await getRedirectResult(auth);
-
-        if (result && result.user) {
-          console.log(
-            "✅ Google redirect login successful:",
-            result.user.email
-          );
-          toast({
-            title: "Berhasil",
-            description: "Login dengan Google berhasil!",
-          });
-          // UserContext will handle the rest
-          setLocation("/");
-        }
-      } catch (error: any) {
-        console.error("❌ Redirect result error:", error);
-        if (error.code && error.code !== "auth/popup-closed-by-user") {
-          toast({
-            variant: "destructive",
-            title: "Login Google Gagal",
-            description:
-              error.message || "Terjadi kesalahan saat login dengan Google",
-          });
-        }
-      } finally {
-        setIsLoading(false);
-      }
+    const handleAuthRedirect = () => {
+      console.log("✅ Auth redirect detected - redirecting to dashboard");
+      toast({
+        title: "Berhasil",
+        description: "Login dengan Google berhasil!",
+      });
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        setLocation("/");
+      }, 500);
     };
 
-    checkRedirectResult();
-  }, []);
+    window.addEventListener("authRedirectComplete", handleAuthRedirect);
+
+    return () => {
+      window.removeEventListener("authRedirectComplete", handleAuthRedirect);
+    };
+  }, [setLocation, toast]);
 
   const handleConfirmResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +201,16 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Check network connection first
+    if (!isOnline) {
+      toast({
+        variant: "destructive",
+        title: "Offline",
+        description: "Anda sedang offline. Periksa koneksi internet Anda.",
+      });
+      return;
+    }
+
     // Validate inputs before attempting login
     if (!email || !password) {
       toast({
@@ -215,7 +233,9 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      console.log("🔐 Starting login process...");
+      console.log("🔐 Starting login process for:", email);
+      console.log("📱 Device: ", /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop");
+      
       await login(email, password, remember);
 
       console.log("✅ Login successful, redirecting...");
@@ -224,7 +244,7 @@ export default function Login() {
       // Small delay to ensure state is updated
       setTimeout(() => {
         setLocation("/");
-      }, 100);
+      }, 500);
     } catch (error: any) {
       console.error("❌ Login error:", error);
 
@@ -251,6 +271,8 @@ export default function Login() {
       } else if (error.message && error.message.includes("timeout")) {
         errorMessage =
           "Login timeout. Koneksi internet Anda mungkin lambat. Silakan coba lagi.";
+      } else if (!isOnline) {
+        errorMessage = "Koneksi internet terputus. Periksa jaringan Anda.";
       }
 
       toast({
@@ -265,9 +287,21 @@ export default function Login() {
   };
 
   const handleGoogle = async () => {
+    // Check network connection first
+    if (!isOnline) {
+      toast({
+        variant: "destructive",
+        title: "Offline",
+        description: "Anda sedang offline. Periksa koneksi internet Anda.",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       console.log("🔐 Starting Google login...");
+      console.log("📱 Device: ", /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop");
+      
       await loginWithGoogle();
 
       // For redirect flow (mobile), the function will return early
@@ -281,7 +315,7 @@ export default function Login() {
       // Small delay to ensure state is updated
       setTimeout(() => {
         setLocation("/");
-      }, 100);
+      }, 500);
     } catch (error: any) {
       console.error("❌ Google login error:", error);
 
@@ -295,6 +329,8 @@ export default function Login() {
         errorMessage = "Login dibatalkan. Silakan coba lagi.";
       } else if (error.code === "auth/network-request-failed") {
         errorMessage = "Koneksi internet bermasalah. Periksa jaringan Anda.";
+      } else if (!isOnline) {
+        errorMessage = "Koneksi internet terputus. Periksa jaringan Anda.";
       }
 
       toast({

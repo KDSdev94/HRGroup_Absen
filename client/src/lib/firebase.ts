@@ -46,12 +46,13 @@ try {
 
   // Set persistence for better mobile compatibility
   // Try browserLocalPersistence first, fallback to indexedDB if needed
-  setPersistence(auth, browserLocalPersistence)
-    .then(() => {
+  (async () => {
+    try {
+      console.log("🔐 Setting up Firebase auth persistence...");
+      await setPersistence(auth, browserLocalPersistence);
       console.log("✅ Auth persistence set to browserLocalPersistence");
-    })
-    .catch(async (error) => {
-      console.warn("⚠️ Could not set browserLocalPersistence:", error);
+    } catch (error: any) {
+      console.warn("⚠️ browserLocalPersistence failed:", error.code);
       // Try indexedDB as fallback for mobile browsers
       try {
         const { indexedDBLocalPersistence } = await import("firebase/auth");
@@ -59,10 +60,24 @@ try {
         console.log(
           "✅ Auth persistence set to indexedDBLocalPersistence (fallback)"
         );
-      } catch (fallbackError) {
-        console.error("❌ Could not set any persistence:", fallbackError);
+      } catch (fallbackError: any) {
+        console.warn("⚠️ indexedDBLocalPersistence failed:", fallbackError.code);
+        // Try sessionStorage as last resort
+        try {
+          const { browserSessionPersistence } = await import("firebase/auth");
+          await setPersistence(auth, browserSessionPersistence);
+          console.log(
+            "✅ Auth persistence set to browserSessionPersistence (fallback)"
+          );
+        } catch (sessionError: any) {
+          console.error(
+            "❌ Could not set any persistence:",
+            sessionError.code
+          );
+        }
       }
-    });
+    }
+  })();
 
   // Use emulators in development if available
   if (import.meta.env.DEV) {
