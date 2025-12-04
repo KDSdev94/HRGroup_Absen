@@ -378,7 +378,7 @@ export default function Scan() {
       // 3. Define flexible time windows
       const CHECK_IN_START = 7.5; // 07:30
       const CHECK_IN_END = 11.5; // 11:30
-      const CHECK_OUT_START = 15 + 55 / 60; // 15:55
+      const CHECK_OUT_START = 15.0; // 15:00
       const CHECK_OUT_END = 18.0; // 18:00
 
       // Check if employee has already checked in today
@@ -419,7 +419,7 @@ export default function Scan() {
         // Check-in exists, no check-out yet - must be check-out time
         if (currentTime < CHECK_OUT_START) {
           throw new Error(
-            `Absen pulang belum dibuka. Dimulai pukul 15:55 WIB.`
+            `Absen pulang belum dibuka. Dimulai pukul 15:00 WIB.`
           );
         }
         if (currentTime > CHECK_OUT_END) {
