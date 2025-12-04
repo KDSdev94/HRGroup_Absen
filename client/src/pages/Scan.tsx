@@ -38,6 +38,7 @@ export default function Scan() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isInitializedRef = useRef(false);
+  const isProcessingRef = useRef(false); // Immediate flag to prevent duplicate scans
   const { toast } = useToast();
 
   // Fetch logged-in user's employee ID
@@ -259,9 +260,16 @@ export default function Scan() {
     const file = event.target.files?.[0];
     if (!file || !scannerRef.current) return;
 
+    // Check if already processing
+    if (isProcessingRef.current || processing) {
+      console.log("⚠️ Already processing, ignoring file upload");
+      return;
+    }
+
     try {
       setProcessing(true);
       const result = await scannerRef.current.scanFile(file, false);
+      // onScanSuccess will handle isProcessingRef
       await onScanSuccess(result, null);
     } catch (error: any) {
       console.error("File scan error:", error);
@@ -300,12 +308,33 @@ export default function Scan() {
   ];
 
   const onScanSuccess = async (decodedText: string, decodedResult: any) => {
-    if (processing) return;
-
-    // Stop scanning temporarily
-    if (isCameraActive) {
-      await stopScanning();
+    // IMMEDIATE CHECK - Use ref to prevent race conditions
+    if (isProcessingRef.current) {
+      console.log("⚠️ Already processing, ignoring duplicate scan");
+      return;
     }
+
+    // Set ref immediately (synchronous)
+    isProcessingRef.current = true;
+
+    // Also check state-based processing
+    if (processing) {
+      isProcessingRef.current = false;
+      return;
+    }
+
+    // Stop scanning immediately to prevent more scans
+    if (isCameraActive && scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        setIsCameraActive(false);
+        setIsScanning(false);
+        console.log("✅ Camera stopped after scan");
+      } catch (err) {
+        console.error("⚠️ Error stopping camera:", err);
+      }
+    }
+
     setProcessing(true);
 
     try {
@@ -492,6 +521,8 @@ export default function Scan() {
       }, 3000);
     } finally {
       setProcessing(false);
+      // Reset the ref flag
+      isProcessingRef.current = false;
     }
   };
 
@@ -506,6 +537,7 @@ export default function Scan() {
   const resetScan = () => {
     setScanResult(null);
     setIsScanning(false);
+    isProcessingRef.current = false; // Reset processing flag
     // Refresh attendance status
     if (currentEmployeeId) {
       checkTodayAttendance(currentEmployeeId);

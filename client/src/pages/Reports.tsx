@@ -9,12 +9,23 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -23,9 +34,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Download, FileSpreadsheet, MapPin, Eye } from "lucide-react";
+import { Download, FileSpreadsheet, MapPin, Eye, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -87,6 +106,11 @@ export default function Reports() {
   const [recordAddresses, setRecordAddresses] = useState<
     Record<string, string>
   >({});
+  const [selectedRecords, setSelectedRecords] = useState<Set<string>>(
+    new Set()
+  );
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   const DIVISIONS = [
@@ -213,6 +237,69 @@ export default function Reports() {
     });
   };
 
+  // Handle checkbox selection
+  const toggleRecordSelection = (recordId: string) => {
+    const newSelected = new Set(selectedRecords);
+    if (newSelected.has(recordId)) {
+      newSelected.delete(recordId);
+    } else {
+      newSelected.add(recordId);
+    }
+    setSelectedRecords(newSelected);
+  };
+
+  // Select all records
+  const selectAllRecords = () => {
+    const allIds = new Set(filteredAttendance.map((r) => r.id));
+    setSelectedRecords(allIds);
+  };
+
+  // Clear all selections
+  const clearAllSelections = () => {
+    setSelectedRecords(new Set());
+  };
+
+  // Check if all records are selected
+  const isAllSelected =
+    filteredAttendance.length > 0 &&
+    selectedRecords.size === filteredAttendance.length;
+
+  // Handle delete selected records
+  const handleDeleteSelected = async () => {
+    if (selectedRecords.size === 0) return;
+
+    setDeleting(true);
+    try {
+      // Delete all selected records
+      const deletePromises = Array.from(selectedRecords).map((recordId) =>
+        deleteDoc(doc(db, "attendance", recordId))
+      );
+      await Promise.all(deletePromises);
+
+      // Show success toast
+      toast({
+        title: "✅ Berhasil Dihapus",
+        description: `${selectedRecords.size} data laporan berhasil dihapus.`,
+        duration: 3000,
+      });
+
+      // Refresh data and clear selection
+      await fetchAttendance();
+      setSelectedRecords(new Set());
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error("Error deleting records:", error);
+      toast({
+        variant: "destructive",
+        title: "❌ Gagal Menghapus",
+        description: "Terjadi kesalahan saat menghapus data.",
+        duration: 4000,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const exportToExcel = () => {
     const ws = XLSX.utils.json_to_sheet(
       filteredAttendance.map((row) => ({
@@ -282,7 +369,17 @@ export default function Reports() {
             Lihat dan ekspor data kehadiran peserta.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {selectedRecords.size > 0 && (
+            <Button
+              variant="destructive"
+              className="gap-2"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Hapus ({selectedRecords.size})
+            </Button>
+          )}
           <Button variant="outline" className="gap-2" onClick={exportToExcel}>
             <FileSpreadsheet className="h-4 w-4" /> Ekspor Excel
           </Button>
@@ -321,14 +418,38 @@ export default function Reports() {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            Rekap Kehadiran Terbaru ({filteredAttendance.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Rekap Kehadiran Terbaru ({filteredAttendance.length})
+            </CardTitle>
+            {selectedRecords.size > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllSelections}
+                className="text-sm"
+              >
+                Bersihkan Pilihan
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        selectAllRecords();
+                      } else {
+                        clearAllSelections();
+                      }
+                    }}
+                  />
+                </TableHead>
                 <TableHead>No</TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead>Divisi</TableHead>
@@ -343,7 +464,7 @@ export default function Reports() {
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center py-8 text-gray-500"
                   >
                     Memuat data...
@@ -352,7 +473,7 @@ export default function Reports() {
               ) : filteredAttendance.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center py-8 text-gray-500"
                   >
                     Tidak ada data ditemukan.
@@ -361,8 +482,22 @@ export default function Reports() {
               ) : (
                 filteredAttendance.map((record, index) => {
                   const locStatus = getLocationStatus(record);
+                  const isSelected = selectedRecords.has(record.id);
                   return (
-                    <TableRow key={record.id}>
+                    <TableRow
+                      key={record.id}
+                      className={
+                        isSelected ? "bg-blue-50 dark:bg-blue-950/20" : ""
+                      }
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() =>
+                            toggleRecordSelection(record.id)
+                          }
+                        />
+                      </TableCell>
                       <TableCell className="text-gray-500 text-sm">
                         {index + 1}
                       </TableCell>
@@ -540,6 +675,33 @@ export default function Reports() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus {selectedRecords.size} data
+              laporan?
+              <br />
+              <span className="font-semibold text-red-600">
+                Tindakan ini tidak dapat dibatalkan.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? "Menghapus..." : "Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
