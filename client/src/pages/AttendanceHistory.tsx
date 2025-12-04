@@ -337,9 +337,67 @@ export default function AttendanceHistory() {
       );
       const data = await response.json();
 
-      // Extract meaningful address parts
+      // Build accurate address from detailed components
+      let addressParts: string[] = [];
+
+      if (data.address) {
+        const addr = data.address;
+
+        // Road/street information (most specific)
+        if (addr.road) {
+          addressParts.push(addr.road);
+        } else if (addr.pedestrian) {
+          addressParts.push(addr.pedestrian);
+        } else if (addr.footway) {
+          addressParts.push(addr.footway);
+        }
+
+        // Building/house number
+        if (addr.house_number) {
+          addressParts[addressParts.length - 1] = `${addr.house_number} ${
+            addressParts[addressParts.length - 1] || ""
+          }`.trim();
+        }
+
+        // Neighbourhood/suburb/village
+        if (addr.neighbourhood) {
+          addressParts.push(addr.neighbourhood);
+        } else if (addr.suburb) {
+          addressParts.push(addr.suburb);
+        } else if (addr.village) {
+          addressParts.push(addr.village);
+        } else if (addr.hamlet) {
+          addressParts.push(addr.hamlet);
+        }
+
+        // City/town/district
+        if (addr.city) {
+          addressParts.push(addr.city);
+        } else if (addr.town) {
+          addressParts.push(addr.town);
+        } else if (addr.municipality) {
+          addressParts.push(addr.municipality);
+        } else if (addr.city_district) {
+          addressParts.push(addr.city_district);
+        }
+
+        // State/province
+        if (addr.state) {
+          addressParts.push(addr.state);
+        }
+
+        // Country
+        if (addr.country) {
+          addressParts.push(addr.country);
+        }
+      }
+
+      // If we couldn't build address from components, use display_name as fallback
       const address =
-        data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        addressParts.length > 0
+          ? addressParts.join(", ")
+          : data.display_name ||
+            `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 
       // Cache the address
       setLocationAddresses((prev) => ({ ...prev, [key]: address }));
@@ -347,7 +405,7 @@ export default function AttendanceHistory() {
       return address;
     } catch (error) {
       console.error("Error getting address:", error);
-      return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
     }
   };
 
