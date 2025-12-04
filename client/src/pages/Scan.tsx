@@ -375,11 +375,11 @@ export default function Scan() {
         throw new Error("Absensi libur pada tanggal merah.");
       }
 
-      // 3. Define flexible time windows
+      // 3. Define flexible time windows (in WIB)
       const CHECK_IN_START = 7.5; // 07:30
       const CHECK_IN_END = 11.5; // 11:30
-      const CHECK_OUT_START = 15.0; // 15:00
-      const CHECK_OUT_END = 18.0; // 18:00
+      const CHECK_OUT_START = 15.0; // 15:00 (3pm)
+      const CHECK_OUT_END = 22.0; // 22:00 (10pm) - extended time window
 
       // Check if employee has already checked in today
       const checkInQuery = query(
@@ -424,7 +424,7 @@ export default function Scan() {
         }
         if (currentTime > CHECK_OUT_END) {
           throw new Error(
-            `Absen pulang sudah ditutup. Berakhir pukul 18:00 WIB.`
+            `Absen pulang sudah ditutup. Berakhir pukul 22:00 WIB.`
           );
         }
         attendanceType = "check-out";
@@ -434,23 +434,59 @@ export default function Scan() {
         throw new Error("Anda sudah melakukan absen pulang hari ini.");
       }
 
-      // Get Location with high accuracy
-      const location = await new Promise<GeolocationPosition>(
-        (resolve, reject) => {
-          if (!navigator.geolocation) {
-            reject(new Error("Geolocation is not supported by your browser"));
-          } else {
-            // Request high accuracy location with timeout
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true, // Use GPS if available
-              timeout: 10000, // 10 second timeout
-              maximumAge: 0, // Don't use cached position
-            });
-          }
-        }
-      );
+      // Get Location - Try to get location but don't block attendance
+      let latitude = -6.2; // Default Jakarta coordinates
+      let longitude = 106.816666;
+      let locationObtained = false;
 
-      const { latitude, longitude } = location.coords;
+      if (navigator.geolocation) {
+        try {
+          console.log("📍 Attempting to get location (non-blocking)...");
+
+          // Try low accuracy first (faster and more reliable)
+          const locationPromise = new Promise<GeolocationPosition>(
+            (resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  resolve(position);
+                },
+                (error) => {
+                  reject(error);
+                },
+                {
+                  enableHighAccuracy: false, // Use network/wifi location (faster)
+                  timeout: 8000, // 8 second timeout
+                  maximumAge: 60000, // Accept cached position up to 60 seconds old
+                }
+              );
+            }
+          );
+
+          // Race between location and timeout - but don't fail if location times out
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), 8000)
+          );
+
+          const result = await Promise.race([locationPromise, timeoutPromise]);
+
+          if (result) {
+            latitude = result.coords.latitude;
+            longitude = result.coords.longitude;
+            locationObtained = true;
+            console.log("✅ Location obtained:", { latitude, longitude });
+          } else {
+            console.warn("⚠️ Location timeout, using default location");
+          }
+        } catch (locationError: any) {
+          console.warn(
+            "⚠️ Location error (using default):",
+            locationError.message || locationError.code
+          );
+          // Keep default location - don't fail attendance
+        }
+      } else {
+        console.warn("⚠️ Geolocation not supported, using default location");
+      }
 
       // Update scan result to include attendance type
       setScanResult({
@@ -459,7 +495,7 @@ export default function Scan() {
       });
 
       // Log attendance to Firebase with Location
-      await addDoc(collection(db, "attendance"), {
+      const attendanceData: any = {
         employeeId: data.id,
         employeeName: data.name,
         division: data.division,
@@ -469,8 +505,30 @@ export default function Scan() {
         location: {
           latitude,
           longitude,
+          accuracy: locationObtained ? "high/low" : "default",
+          obtained: locationObtained,
         },
-      });
+      };
+
+      console.log("📍 Saving attendance with location:", attendanceData);
+
+      try {
+        const docRef = await addDoc(
+          collection(db, "attendance"),
+          attendanceData
+        );
+        console.log(
+          "✅ Attendance saved successfully to Firebase with ID:",
+          docRef.id
+        );
+      } catch (saveError: any) {
+        console.error("❌ Error saving to Firebase:", saveError);
+        throw new Error(
+          `Gagal menyimpan data absensi: ${
+            saveError.message || "Unknown error"
+          }`
+        );
+      }
 
       // Get current time for display
       const displayTime = new Date().toLocaleTimeString("id-ID", {
@@ -481,27 +539,32 @@ export default function Scan() {
       });
 
       // Show detailed success toast
+      const locationStatus = locationObtained
+        ? "📍 Lokasi: Terdeteksi"
+        : "📍 Lokasi: Default (GPS tidak tersedia)";
+
       toast({
         title:
           attendanceType === "check-in"
             ? "✅ Absen Masuk Berhasil"
             : "✅ Absen Pulang Berhasil",
-        description: `${data.name} - ${data.division}\n${displayTime} WIB`,
-        duration: 3000,
+        description: `${data.name} - ${data.division}\n${displayTime} WIB\n${locationStatus}\n✓ Data tersimpan ke database`,
+        duration: 5000,
       });
+
+      // Refresh attendance status immediately after successful save
+      await checkTodayAttendance(data.id);
 
       // Auto-reset to scanning mode after 2 seconds
       setTimeout(() => {
         resetScan();
       }, 2000);
     } catch (error: any) {
-      console.error("Scan error", error);
+      console.error("❌ Scan error:", error);
       let errorMessage = "Could not recognize employee QR code.";
 
-      if (error.code === 1) {
-        // PERMISSION_DENIED
-        errorMessage = "Izin lokasi ditolak. Mohon aktifkan layanan lokasi.";
-      } else if (error.message) {
+      // Process error message
+      if (error.message) {
         errorMessage = error.message;
       }
 

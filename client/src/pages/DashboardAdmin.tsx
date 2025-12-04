@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useLocation } from "wouter";
 import {
   collection,
   query,
@@ -52,6 +53,7 @@ const COLORS = [
 ];
 
 export default function DashboardAdmin() {
+  const [, setLocation] = useLocation();
   const [stats, setStats] = useState({
     totalEmployees: 0,
     presentToday: 0,
@@ -101,18 +103,17 @@ export default function DashboardAdmin() {
         query(collection(db, "attendance"), where("date", "==", todayStr))
       );
 
-      const presentToday = attendanceSnapshot.size;
-      console.log("✅ Present today:", presentToday);
-
-      // Calculate late arrivals (check-in after 9:00 AM)
+      // Calculate late arrivals (check-in after 11:00 AM) and unique present employees
       let late = 0;
       const presentEmployeeIds = new Set<string>();
 
       attendanceSnapshot.docs.forEach((doc) => {
         const data = doc.data();
-        presentEmployeeIds.add(data.employeeId);
 
+        // Only count check-in records for presence
         if (data.type === "check-in") {
+          presentEmployeeIds.add(data.employeeId);
+
           // Handle different timestamp formats
           let checkInTime = "00:00:00";
 
@@ -143,6 +144,8 @@ export default function DashboardAdmin() {
         }
       });
 
+      const presentToday = presentEmployeeIds.size;
+      console.log("✅ Present today (unique employees):", presentToday);
       console.log("📊 Late arrivals:", late);
 
       // Calculate division breakdown
@@ -169,7 +172,7 @@ export default function DashboardAdmin() {
         query(
           collection(db, "activities"),
           orderBy("timestamp", "desc"),
-          limit(3)
+          limit(6)
         )
       );
 
@@ -181,16 +184,16 @@ export default function DashboardAdmin() {
           "⚠️ Activities collection is empty, using attendance records instead"
         );
 
-        // Get recent attendance records (last 10)
+        // Get recent attendance records (last 20 to ensure we get enough unique activities)
         const recentAttendance = await getDocs(
           query(
             collection(db, "attendance"),
             orderBy("timestamp", "desc"),
-            limit(10)
+            limit(20)
           )
         );
 
-        activitiesList = recentAttendance.docs.slice(0, 3).map((doc) => {
+        activitiesList = recentAttendance.docs.slice(0, 6).map((doc) => {
           const data = doc.data();
 
           // Convert Firestore Timestamp to ISO string for consistent handling
@@ -257,8 +260,19 @@ export default function DashboardAdmin() {
     }
   };
 
-  const StatCard = ({ title, value, icon: Icon, color, subtext }: any) => (
-    <Card className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: color }}>
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    color,
+    subtext,
+    onClick,
+  }: any) => (
+    <Card
+      className="border-l-4 hover:shadow-md transition-all cursor-pointer hover:scale-[1.02]"
+      style={{ borderLeftColor: color }}
+      onClick={onClick}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6 pt-4 sm:pt-6">
         <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 leading-tight">
           {title}
@@ -269,13 +283,11 @@ export default function DashboardAdmin() {
       </CardHeader>
       <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
         <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-          {loadingStats ? (
-            <span className="animate-pulse">...</span>
-          ) : (
-            value
-          )}
+          {loadingStats ? <span className="animate-pulse">...</span> : value}
         </div>
-        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1.5 leading-tight">{subtext}</p>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1.5 leading-tight">
+          {subtext}
+        </p>
       </CardContent>
     </Card>
   );
@@ -348,6 +360,7 @@ export default function DashboardAdmin() {
           icon={Users}
           color="hsl(var(--primary))"
           subtext="Aktif dalam sistem"
+          onClick={() => setLocation("/employees")}
         />
         <StatCard
           title="Hadir Hari Ini"
@@ -355,6 +368,7 @@ export default function DashboardAdmin() {
           icon={CheckCircle2}
           color="#10b981"
           subtext="Sudah check in"
+          onClick={() => setLocation("/attendance/today")}
         />
         <StatCard
           title="Terlambat"
@@ -362,6 +376,7 @@ export default function DashboardAdmin() {
           icon={Clock}
           color="#f59e0b"
           subtext="Setelah 11:00 AM"
+          onClick={() => setLocation("/attendance/late")}
         />
         <StatCard
           title="Tidak Hadir"
@@ -369,6 +384,7 @@ export default function DashboardAdmin() {
           icon={XCircle}
           color="#ef4444"
           subtext="Belum check in"
+          onClick={() => setLocation("/attendance/absent")}
         />
       </div>
 
@@ -380,13 +396,15 @@ export default function DashboardAdmin() {
               <div className="rounded-lg p-2 bg-primary/10">
                 <Activity className="h-5 w-5 text-primary" />
               </div>
-              <CardTitle className="text-lg sm:text-xl font-bold">Aktivitas Terbaru</CardTitle>
+              <CardTitle className="text-lg sm:text-xl font-bold">
+                Aktivitas Terbaru
+              </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6">
             {loadingStats ? (
               <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div
                     key={i}
                     className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
@@ -418,7 +436,9 @@ export default function DashboardAdmin() {
                           </p>
                           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                             {activity.division && (
-                              <span className="font-medium">{activity.division}</span>
+                              <span className="font-medium">
+                                {activity.division}
+                              </span>
                             )}
                             {activity.division && " • "}
                             <span>{formatTimestamp(activity.timestamp)}</span>
@@ -450,50 +470,200 @@ export default function DashboardAdmin() {
               <div className="rounded-lg p-2 bg-blue-500/10">
                 <TrendingUp className="h-5 w-5 text-blue-500" />
               </div>
-              <CardTitle className="text-lg sm:text-xl font-bold">Overview Per Divisi</CardTitle>
+              <div className="flex-1">
+                <CardTitle className="text-lg sm:text-xl font-bold">
+                  Overview Per Divisi
+                </CardTitle>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Distribusi peserta berdasarkan divisi
+                </p>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6">
             {loadingStats ? (
-              <div className="h-64 sm:h-72 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div className="space-y-4">
+                <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                    />
+                  ))}
+                </div>
+              </div>
             ) : divisionData.length === 0 ? (
               <div className="text-sm text-gray-500 text-center py-8 sm:py-12">
                 <TrendingUp className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p>Tidak ada data divisi.</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 280 : 320}>
-                <PieChart>
-                  <Pie
-                    data={divisionData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {divisionData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={
-                          DIVISION_COLORS[entry.name] ||
-                          COLORS[index % COLORS.length]
-                        }
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(255, 255, 255, 0.95)",
-                      border: "1px solid #ccc",
-                      borderRadius: "8px",
-                      padding: "8px",
+              <div className="space-y-6">
+                {/* Pie Chart - Clean Version with Shadow */}
+                <div className="flex justify-center p-4">
+                  <div
+                    className="relative"
+                    style={{
+                      filter:
+                        "drop-shadow(0 10px 25px rgba(0, 0, 0, 0.15)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.1))",
                     }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+                  >
+                    <ResponsiveContainer width={220} height={220}>
+                      <PieChart>
+                        <defs>
+                          {divisionData.map((entry, index) => {
+                            const color =
+                              DIVISION_COLORS[entry.name] ||
+                              COLORS[index % COLORS.length];
+                            return (
+                              <filter
+                                key={`shadow-${index}`}
+                                id={`shadow-${index}`}
+                                height="150%"
+                              >
+                                <feGaussianBlur
+                                  in="SourceAlpha"
+                                  stdDeviation="3"
+                                />
+                                <feOffset dx="0" dy="2" result="offsetblur" />
+                                <feComponentTransfer>
+                                  <feFuncA type="linear" slope="0.3" />
+                                </feComponentTransfer>
+                                <feMerge>
+                                  <feMergeNode />
+                                  <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                              </filter>
+                            );
+                          })}
+                        </defs>
+                        <Pie
+                          data={divisionData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={90}
+                          innerRadius={55}
+                          fill="#8884d8"
+                          dataKey="value"
+                          paddingAngle={3}
+                          strokeWidth={0}
+                        >
+                          {divisionData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={
+                                DIVISION_COLORS[entry.name] ||
+                                COLORS[index % COLORS.length]
+                              }
+                              className="transition-all hover:opacity-90"
+                              style={{
+                                filter: "brightness(1.05)",
+                              }}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "rgba(255, 255, 255, 0.98)",
+                            border: "none",
+                            borderRadius: "12px",
+                            padding: "12px 16px",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                          }}
+                          formatter={(value: any, name: string) => {
+                            const total = divisionData.reduce(
+                              (sum, item) => sum + item.value,
+                              0
+                            );
+                            const percentage = ((value / total) * 100).toFixed(
+                              1
+                            );
+                            return [`${value} orang (${percentage}%)`, name];
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Legend dengan detail statistik */}
+                <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar">
+                  {divisionData
+                    .sort((a, b) => b.value - a.value)
+                    .map((division, index) => {
+                      const total = divisionData.reduce(
+                        (sum, item) => sum + item.value,
+                        0
+                      );
+                      const percentage = (
+                        (division.value / total) *
+                        100
+                      ).toFixed(1);
+                      const color =
+                        DIVISION_COLORS[division.name] ||
+                        COLORS[index % COLORS.length];
+
+                      return (
+                        <div
+                          key={division.name}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all group"
+                        >
+                          {/* Color indicator with shadow */}
+                          <div
+                            className="w-4 h-4 rounded-full shrink-0 ring-2 ring-offset-2 ring-transparent group-hover:ring-opacity-50 transition-all"
+                            style={{
+                              backgroundColor: color,
+                              boxShadow: `0 2px 8px ${color}40, 0 0 0 0 ${color}20`,
+                            }}
+                          />
+
+                          {/* Division info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                              {division.name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-500"
+                                  style={{
+                                    backgroundColor: color,
+                                    width: `${percentage}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Stats */}
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">
+                              {division.value}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {percentage}%
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Total summary */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between px-3">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Total Peserta
+                    </span>
+                    <span className="text-lg font-bold text-primary">
+                      {divisionData.reduce((sum, item) => sum + item.value, 0)}{" "}
+                      orang
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

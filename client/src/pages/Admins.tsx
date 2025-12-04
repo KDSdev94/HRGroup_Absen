@@ -69,15 +69,33 @@ export default function Admins() {
   const fetchAdmins = async () => {
     try {
       setLoading(true);
-      // Query users collection where role is "admin"
-      const q = query(collection(db, "users"), where("role", "==", "admin"));
-      const querySnapshot = await getDocs(q);
+      // Query users collection where role is "admin" or "superadmin"
+      const qAdmin = query(
+        collection(db, "users"),
+        where("role", "==", "admin")
+      );
+      const qSuperadmin = query(
+        collection(db, "users"),
+        where("role", "==", "superadmin")
+      );
 
-      const adminsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        uid: doc.id,
-        ...doc.data(),
-      })) as Admin[];
+      const [adminSnapshot, superadminSnapshot] = await Promise.all([
+        getDocs(qAdmin),
+        getDocs(qSuperadmin),
+      ]);
+
+      const adminsData = [
+        ...adminSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          uid: doc.id,
+          ...doc.data(),
+        })),
+        ...superadminSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          uid: doc.id,
+          ...doc.data(),
+        })),
+      ] as Admin[];
 
       setAdmins(adminsData);
     } catch (error) {
@@ -233,8 +251,8 @@ export default function Admins() {
           Kelola Admin
         </h1>
         <p className="text-gray-500 mt-2">
-          Buat, edit, dan hapus akun admin. Admin memiliki akses penuh ke
-          sistem.
+          Buat, edit, dan hapus akun admin dan superadmin. Admin memiliki akses
+          ke manajemen peserta dan laporan.
         </p>
       </div>
 
@@ -353,8 +371,14 @@ export default function Admins() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="px-2.5 py-0.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                          {admin.role}
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-sm font-medium capitalize ${
+                            admin.role === "superadmin"
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                          }`}
+                        >
+                          {admin.role === "superadmin" ? "Superadmin" : "Admin"}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">

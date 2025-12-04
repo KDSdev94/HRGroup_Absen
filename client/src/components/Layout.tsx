@@ -16,14 +16,20 @@ import {
   Sun,
   Moon,
   Users2,
-  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import {
   Tooltip,
   TooltipContent,
@@ -37,8 +43,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [userDisplayInfo, setUserDisplayInfo] = useState<{
+    line1: string;
+    line2: string;
+  }>({ line1: "", line2: "" });
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
+
+  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     // Check if auth is available
@@ -58,19 +80,69 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       } else {
         setUser(currentUser);
         if (currentUser && db) {
-          // Fetch user role
+          // Fetch user role and display info
           try {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
             if (userDoc.exists()) {
-              setRole(userDoc.data().role);
+              const userData = userDoc.data();
+              const userRole = userData.role;
+              setRole(userRole);
+
+              // Set display info based on role
+              if (userRole === "admin" || userRole === "superadmin") {
+                // For admin/superadmin: display name + email
+                setUserDisplayInfo({
+                  line1: userData.displayName || currentUser.email || "Admin",
+                  line2: currentUser.email || "",
+                });
+              } else if (userRole === "employee") {
+                // For employee: get name and division from employees collection
+                try {
+                  const employeesSnapshot = await getDocs(
+                    query(
+                      collection(db, "employees"),
+                      where("userId", "==", currentUser.uid)
+                    )
+                  );
+
+                  if (!employeesSnapshot.empty) {
+                    const employeeData = employeesSnapshot.docs[0].data();
+                    setUserDisplayInfo({
+                      line1:
+                        employeeData.name || currentUser.email || "Employee",
+                      line2: employeeData.division || "Tidak ada divisi",
+                    });
+                  } else {
+                    // Fallback if employee data not found
+                    setUserDisplayInfo({
+                      line1: currentUser.email || "Employee",
+                      line2: "Employee",
+                    });
+                  }
+                } catch (error) {
+                  console.error("Error fetching employee data:", error);
+                  setUserDisplayInfo({
+                    line1: currentUser.email || "Employee",
+                    line2: "Employee",
+                  });
+                }
+              }
             } else {
               // Fallback if no role found (e.g. old admin account)
               // Assuming admin@hrgroup.com is always superadmin (panel admin)
               if (currentUser.email === "admin@hrgroup.com") {
                 setRole("superadmin");
+                setUserDisplayInfo({
+                  line1: "Superadmin",
+                  line2: currentUser.email || "",
+                });
               } else {
                 // Default to employee role for new users without explicit role
                 setRole("employee");
+                setUserDisplayInfo({
+                  line1: currentUser.email || "User",
+                  line2: "Employee",
+                });
               }
             }
           } catch (error) {
@@ -78,6 +150,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           }
         } else {
           setRole(null);
+          setUserDisplayInfo({ line1: "", line2: "" });
         }
       }
     });
@@ -127,12 +200,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       roles: ["superadmin"],
     },
     {
-      icon: Database,
-      label: "Pembersihan Data",
-      href: "/data-cleanup",
-      roles: ["superadmin"],
-    },
-    {
       icon: QrCode,
       label: "Scan Absensi",
       href: "/scan",
@@ -176,30 +243,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed lg:static inset-y-0 left-0 z-50
+          fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto
           bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
-          transform transition-all duration-300 ease-in-out
+          transition-all duration-300 ease-in-out
           ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           ${isCollapsed ? "lg:w-20" : "lg:w-64"}
-          w-64
-          flex-col relative
-          hidden lg:flex
-          ${sidebarOpen ? "!flex" : ""}
+          w-80 sm:w-80
+          flex flex-col
+          h-screen lg:h-auto lg:min-h-screen overflow-y-auto
         `}
       >
         <div
-          className={`h-16 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white dark:text-gray-900 ${
+          className={`h-20 lg:h-16 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 transition-all duration-300 dark:bg-white dark:text-gray-900 ${
             isCollapsed ? "lg:px-2" : "lg:px-6"
-          } px-4`}
+          } px-6`}
         >
           <div className="flex items-center justify-center overflow-hidden w-full">
             <img
               src={isCollapsed ? "/logo.png" : "/header.webp"}
               alt="HR Group Attendance"
               className={`transition-all duration-300 object-contain ${
-                isCollapsed ? "lg:h-10 lg:w-10 h-12" : "h-12"
+                isCollapsed ? "lg:h-10 lg:w-10 h-14" : "h-14 lg:h-12"
               }`}
             />
           </div>
@@ -213,12 +279,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     size="icon"
                     onClick={toggleTheme}
-                    className="h-9 w-9"
+                    className="h-10 w-10 lg:h-9 lg:w-9"
                   >
                     {theme === "dark" ? (
-                      <Sun className="h-4 w-4" />
+                      <Sun className="h-5 w-5 lg:h-4 lg:w-4" />
                     ) : (
-                      <Moon className="h-4 w-4" />
+                      <Moon className="h-5 w-5 lg:h-4 lg:w-4" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -229,13 +295,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </TooltipProvider>
 
             {/* Mobile Close Button */}
-            <button className="lg:hidden" onClick={() => setSidebarOpen(false)}>
-              <X className="h-5 w-5" />
+            <button
+              className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="h-6 w-6" />
             </button>
           </div>
         </div>
 
-        <nav className="p-2 sm:p-3 space-y-1 flex-1 overflow-y-auto">
+        <nav className="p-4 lg:p-2 lg:sm:p-3 space-y-2 flex-1 overflow-y-auto">
           <TooltipProvider delayDuration={0}>
             {navItems.map((item) => {
               const isActive = location === item.href;
@@ -245,7 +314,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <Link href={item.href}>
                       <div
                         className={`
-                          flex items-center gap-3 px-3 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer
+                          flex items-center gap-4 px-4 py-3.5 lg:gap-3 lg:px-3 lg:py-2.5 lg:sm:py-3 rounded-lg text-base lg:text-sm font-medium transition-all duration-200 cursor-pointer
                           ${
                             isActive
                               ? "bg-primary/10 text-primary"
@@ -256,13 +325,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         onClick={() => setSidebarOpen(false)}
                       >
                         <item.icon
-                          className={`h-5 w-5 shrink-0 ${
+                          className={`h-6 w-6 lg:h-5 lg:w-5 shrink-0 ${
                             isActive ? "text-primary" : ""
                           }`}
                         />
                         <span
                           className={`whitespace-nowrap transition-all duration-300 ${
-                            isCollapsed ? "lg:opacity-0 lg:w-0 lg:hidden" : "opacity-100"
+                            isCollapsed
+                              ? "lg:opacity-0 lg:w-0 lg:hidden"
+                              : "opacity-100"
                           }`}
                         >
                           {item.label}
@@ -305,22 +376,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div
-          className={`p-3 sm:p-4 border-t border-gray-200 dark:border-gray-700 ${
+          className={`p-5 lg:p-3 lg:sm:p-4 border-t border-gray-200 dark:border-gray-700 ${
             isCollapsed ? "lg:items-center" : ""
           }`}
         >
-          <div className={`flex items-center gap-3 px-2 py-2 mb-2 animate-in fade-in duration-300 ${
-            isCollapsed ? "lg:hidden" : ""
-          }`}>
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
-              {user?.email?.[0]?.toUpperCase() || "U"}
+          <div
+            className={`flex items-center gap-4 lg:gap-3 px-3 lg:px-2 py-3 lg:py-2 mb-3 lg:mb-2 animate-in fade-in duration-300 ${
+              isCollapsed ? "lg:hidden" : ""
+            }`}
+          >
+            <div className="h-11 w-11 lg:h-8 lg:w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg lg:text-base shrink-0">
+              {userDisplayInfo.line1?.[0]?.toUpperCase() ||
+                user?.email?.[0]?.toUpperCase() ||
+                "U"}
             </div>
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
-                {user?.email || "User"}
+              <p className="text-base lg:text-sm font-medium truncate text-gray-900 dark:text-white">
+                {userDisplayInfo.line1 || user?.email || "User"}
               </p>
-              <p className="text-xs text-gray-500 truncate capitalize">
-                {role || "Loading..."}
+              <p className="text-sm lg:text-xs text-gray-500 truncate">
+                {userDisplayInfo.line2 || role || "Loading..."}
               </p>
             </div>
           </div>
@@ -330,13 +405,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100 transition-all ${
-                    isCollapsed ? "lg:justify-center lg:px-2 justify-start gap-2" : "justify-start gap-2"
+                  className={`w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100 transition-all h-12 lg:h-auto text-base lg:text-sm ${
+                    isCollapsed
+                      ? "lg:justify-center lg:px-2 justify-start gap-3 lg:gap-2"
+                      : "justify-start gap-3 lg:gap-2"
                   }`}
                   onClick={handleLogout}
                 >
-                  <LogOut className="h-4 w-4 shrink-0" />
-                  <span className={isCollapsed ? "lg:hidden" : ""}> Keluar</span>
+                  <LogOut className="h-5 w-5 lg:h-4 lg:w-4 shrink-0" />
+                  <span className={isCollapsed ? "lg:hidden" : ""}>
+                    {" "}
+                    Keluar
+                  </span>
                 </Button>
               </TooltipTrigger>
               {isCollapsed && (
@@ -348,7 +428,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300 w-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-screen w-full">
         <header className="h-14 sm:h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-3 sm:px-4 lg:px-8 justify-between lg:justify-end sticky top-0 z-30">
           <button
             className="lg:hidden p-1.5 sm:p-2 -ml-1.5 sm:-ml-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

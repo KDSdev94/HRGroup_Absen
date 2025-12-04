@@ -16,8 +16,10 @@ import Reports from "@/pages/Reports";
 import AttendanceHistory from "@/pages/AttendanceHistory";
 import Admins from "@/pages/Admins";
 import EmployeeUsers from "@/pages/EmployeeUsers";
-import DataCleanup from "@/pages/DataCleanup";
 import Profile from "@/pages/Profile";
+import TodayAttendance from "@/pages/TodayAttendance";
+import LateAttendance from "@/pages/LateAttendance";
+import AbsentToday from "@/pages/AbsentToday";
 import Layout from "@/components/Layout";
 import { UserProvider } from "./contexts/UserContext";
 
@@ -40,6 +42,21 @@ function Router() {
             <Reports />
           </ProtectedRoute>
         </Route>
+        <Route path="/attendance/today">
+          <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
+            <TodayAttendance />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/attendance/late">
+          <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
+            <LateAttendance />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/attendance/absent">
+          <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
+            <AbsentToday />
+          </ProtectedRoute>
+        </Route>
 
         {/* Superadmin-only routes */}
         <Route path="/admins">
@@ -50,11 +67,6 @@ function Router() {
         <Route path="/employee-users">
           <ProtectedRoute allowedRoles={["superadmin"]}>
             <EmployeeUsers />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/data-cleanup">
-          <ProtectedRoute allowedRoles={["superadmin"]}>
-            <DataCleanup />
           </ProtectedRoute>
         </Route>
 
