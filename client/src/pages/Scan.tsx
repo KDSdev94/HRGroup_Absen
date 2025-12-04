@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
@@ -37,6 +37,7 @@ export default function Scan() {
   >(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isInitializedRef = useRef(false);
   const { toast } = useToast();
 
   // Fetch logged-in user's employee ID
@@ -116,64 +117,138 @@ export default function Scan() {
     }
   };
 
-  // Initialize scanner instance
+  // Initialize scanner instance only once
   useEffect(() => {
-    if (!scannerRef.current) {
-      scannerRef.current = new Html5Qrcode("reader");
+    if (!isInitializedRef.current) {
+      try {
+        scannerRef.current = new Html5Qrcode("reader");
+        isInitializedRef.current = true;
+        console.log("📷 Scanner instance created");
+      } catch (error) {
+        console.error("Error creating scanner:", error);
+      }
     }
 
     return () => {
       // Cleanup on unmount
       if (scannerRef.current && isCameraActive) {
-        scannerRef.current.stop().catch(console.error);
+        console.log("🧹 Cleaning up scanner...");
+        scannerRef.current
+          .stop()
+          .then(() => {
+            console.log("✅ Scanner stopped successfully");
+          })
+          .catch((err) => {
+            console.error("⚠️ Error stopping scanner:", err);
+          });
       }
     };
   }, []);
 
   // Start camera scanning
   const startScanning = async () => {
-    if (!scannerRef.current || isCameraActive) return;
+    if (!scannerRef.current || isCameraActive || processing) {
+      console.log("⚠️ Cannot start: scanner not ready or already active");
+      return;
+    }
+
+    setProcessing(true);
+    console.log("🎥 Starting camera...");
 
     try {
-      // Request camera permissions
-      await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-      });
+      // Simple approach: try rear camera first, then front
+      const cameraConfigs = [
+        { facingMode: "environment" }, // Rear camera
+        { facingMode: "user" }, // Front camera fallback
+      ];
 
-      await scannerRef.current.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        },
-        onScanSuccess,
-        onScanFailure
-      );
+      let started = false;
+
+      for (const config of cameraConfigs) {
+        try {
+          console.log(`🔄 Trying camera with config:`, config);
+
+          // Calculate optimal qrbox size based on screen width
+          const screenWidth = window.innerWidth;
+          const qrboxSize = Math.min(screenWidth * 0.7, 300); // 70% of screen width, max 300px
+
+          await scannerRef.current.start(
+            config,
+            {
+              fps: 30, // Increased FPS for better detection
+              qrbox: qrboxSize, // Use calculated size
+              aspectRatio: 1.0, // Square aspect ratio
+              disableFlip: false, // Allow flipping for better detection
+            },
+            onScanSuccess,
+            onScanFailure
+          );
+
+          started = true;
+          console.log("✅ Camera started successfully with qrbox:", qrboxSize);
+          break;
+        } catch (err: any) {
+          console.log(`⚠️ Failed with this config:`, err.message);
+          // Continue to next config
+        }
+      }
+
+      if (!started) {
+        throw new Error("Tidak dapat memulai kamera");
+      }
 
       setIsCameraActive(true);
       setIsScanning(true);
     } catch (error: any) {
-      console.error("Failed to start scanner:", error);
+      console.error("❌ Failed to start scanner:", error);
+
+      let errorMessage = "Tidak dapat mengakses kamera.";
+
+      if (
+        error.name === "NotAllowedError" ||
+        error.name === "PermissionDeniedError"
+      ) {
+        errorMessage =
+          "Izin kamera ditolak. Silakan aktifkan izin kamera di pengaturan browser.";
+      } else if (
+        error.name === "NotFoundError" ||
+        error.name === "DevicesNotFoundError"
+      ) {
+        errorMessage = "Kamera tidak ditemukan pada perangkat Anda.";
+      } else if (
+        error.name === "NotReadableError" ||
+        error.name === "TrackStartError"
+      ) {
+        errorMessage = "Kamera sedang digunakan oleh aplikasi lain.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         variant: "destructive",
         title: "Error Kamera",
-        description:
-          "Tidak dapat mengakses kamera. Pastikan Anda telah memberikan izin kamera.",
+        description: errorMessage,
       });
+    } finally {
+      setProcessing(false);
     }
   };
 
   // Stop camera scanning
   const stopScanning = async () => {
-    if (!scannerRef.current || !isCameraActive) return;
+    if (!scannerRef.current) return;
 
     try {
+      console.log("🛑 Stopping scanner...");
       await scannerRef.current.stop();
       setIsCameraActive(false);
       setIsScanning(false);
+      console.log("✅ Scanner stopped successfully");
     } catch (error) {
-      console.error("Failed to stop scanner:", error);
+      console.error("❌ Failed to stop scanner:", error);
+      // Force reset state even if stop fails
+      setIsCameraActive(false);
+      setIsScanning(false);
     }
   };
 
@@ -421,7 +496,11 @@ export default function Scan() {
   };
 
   const onScanFailure = (error: any) => {
-    // handle scan failure
+    // Silently handle scan failures (no QR code detected yet)
+    // Only log occasionally to avoid console spam
+    if (Math.random() < 0.01) {
+      console.log("🔍 Scanning for QR code...");
+    }
   };
 
   const resetScan = () => {
@@ -452,7 +531,7 @@ export default function Scan() {
               {/* Scanner Container */}
               <div
                 id="reader"
-                className={`w-full rounded-lg overflow-hidden ${
+                className={`w-full rounded-lg overflow-hidden min-h-[300px] ${
                   isCameraActive ? "" : "hidden"
                 }`}
               ></div>
@@ -511,14 +590,23 @@ export default function Scan() {
                         ? "bg-orange-600 hover:bg-orange-700"
                         : ""
                     }`}
-                    disabled={expectedAttendanceType === null}
+                    disabled={expectedAttendanceType === null || processing}
                   >
-                    <Camera className="mr-2 h-5 w-5" />
-                    {expectedAttendanceType === "check-in"
-                      ? "Scan Absen Masuk"
-                      : expectedAttendanceType === "check-out"
-                      ? "Scan Absen Pulang"
-                      : "Scan"}
+                    {processing ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Memulai Kamera...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="mr-2 h-5 w-5" />
+                        {expectedAttendanceType === "check-in"
+                          ? "Scan Absen Masuk"
+                          : expectedAttendanceType === "check-out"
+                          ? "Scan Absen Pulang"
+                          : "Scan"}
+                      </>
+                    )}
                   </Button>
 
                   <div className="flex items-center gap-3 w-full">

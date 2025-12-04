@@ -234,3 +234,34 @@
   justify-content: center;
   z-index: 9999;
 }
+
+/* QR Scanner Styles */
+#reader {
+  position: relative;
+  width: 100%;
+}
+
+#reader video {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 0.5rem;
+  display: block;
+}
+
+#reader__scan_region {
+  width: 100% !important;
+}
+
+#reader__dashboard_section {
+  display: none !important;
+}
+
+#reader__camera_selection {
+  display: none !important;
+}
+
+/* Ensure scanner is visible */
+#reader canvas {
+  width: 100% !important;
+  height: auto !important;
+}
