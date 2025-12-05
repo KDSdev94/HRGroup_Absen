@@ -164,36 +164,21 @@ export default function DashboardAdmin() {
 
       console.log("📊 Chart data:", chartData);
 
-      // Fetch recent activities - use attendance records as activities
-      console.log("📊 Fetching recent activities...");
+      // Fetch recent activities - Get from attendance records (check-in/check-out)
+      console.log("📊 Fetching recent activities from attendance...");
 
-      // Try to get from activities collection first
-      let activitiesSnapshot = await getDocs(
+      // Get recent attendance records to show employee check-in/check-out activities
+      const recentAttendance = await getDocs(
         query(
-          collection(db, "activities"),
+          collection(db, "attendance"),
           orderBy("timestamp", "desc"),
-          limit(6)
+          limit(10)
         )
       );
 
-      let activitiesList: Activity[] = [];
-
-      // If activities collection is empty, create activities from recent attendance
-      if (activitiesSnapshot.empty) {
-        console.log(
-          "⚠️ Activities collection is empty, using attendance records instead"
-        );
-
-        // Get recent attendance records (last 20 to ensure we get enough unique activities)
-        const recentAttendance = await getDocs(
-          query(
-            collection(db, "attendance"),
-            orderBy("timestamp", "desc"),
-            limit(20)
-          )
-        );
-
-        activitiesList = recentAttendance.docs.slice(0, 6).map((doc) => {
+      const activitiesList: Activity[] = recentAttendance.docs
+        .slice(0, 6)
+        .map((doc) => {
           const data = doc.data();
 
           // Convert Firestore Timestamp to ISO string for consistent handling
@@ -226,12 +211,6 @@ export default function DashboardAdmin() {
             division: data.division,
           };
         }) as Activity[];
-      } else {
-        activitiesList = activitiesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Activity[];
-      }
 
       console.log("✅ Activities found:", activitiesList.length);
 
