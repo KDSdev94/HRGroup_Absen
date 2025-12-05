@@ -250,7 +250,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           ${isCollapsed ? "lg:w-20" : "lg:w-64"}
-          w-80 sm:w-80
+          w-64 sm:w-72
           flex flex-col
           h-screen lg:h-auto lg:min-h-screen overflow-y-auto
         `}

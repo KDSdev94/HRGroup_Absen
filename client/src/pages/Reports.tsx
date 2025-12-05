@@ -33,8 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { Download, FileSpreadsheet, MapPin, Eye, Trash2 } from "lucide-react";
+import { Download, FileSpreadsheet, MapPin, Eye, Trash2, CalendarIcon, X } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -49,6 +55,8 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 interface AttendanceRecord {
   id: string;
@@ -97,6 +105,9 @@ export default function Reports() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterDivision, setFilterDivision] = useState("all");
+  const [filterType, setFilterType] = useState("all"); // all, check-in, check-out
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(
     null
   );
@@ -171,10 +182,37 @@ export default function Reports() {
     }
   };
 
-  // Filter attendance by division
+  // Filter attendance by division, type, and date range
   const filteredAttendance = attendance.filter((record) => {
-    if (filterDivision === "all") return true;
-    return record.division === filterDivision;
+    // Filter by division
+    if (filterDivision !== "all" && record.division !== filterDivision) {
+      return false;
+    }
+    
+    // Filter by type (check-in / check-out)
+    if (filterType !== "all" && record.type !== filterType) {
+      return false;
+    }
+    
+    // Filter by date range
+    if (dateFrom || dateTo) {
+      const recordDate = new Date(record.date);
+      recordDate.setHours(0, 0, 0, 0); // Reset time to compare dates only
+      
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (recordDate < fromDate) return false;
+      }
+      
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(0, 0, 0, 0);
+        if (recordDate > toDate) return false;
+      }
+    }
+    
+    return true;
   });
 
   // Reverse geocoding to get address from coordinates
@@ -450,7 +488,8 @@ export default function Reports() {
           <CardTitle>Filter Laporan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Division Filter */}
             <div className="flex-1">
               <Label>Filter Divisi</Label>
               <Select value={filterDivision} onValueChange={setFilterDivision}>
@@ -467,7 +506,155 @@ export default function Reports() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Type Filter (Check-in / Check-out) */}
+            <div className="flex-1">
+              <Label>Tipe Absensi</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Semua Tipe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Tipe</SelectItem>
+                  <SelectItem value="check-in">Absen Masuk</SelectItem>
+                  <SelectItem value="check-out">Absen Pulang</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date From Filter */}
+            <div className="flex-1">
+              <Label>Dari Tanggal</Label>
+              <div className="mt-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? (
+                        format(dateFrom, "dd MMMM yyyy", { locale: localeId })
+                      ) : (
+                        <span>Pilih tanggal awal</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                    {dateFrom && (
+                      <div className="p-3 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setDateFrom(undefined)}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Hapus Filter
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Date To Filter */}
+            <div className="flex-1">
+              <Label>Sampai Tanggal</Label>
+              <div className="mt-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? (
+                        format(dateTo, "dd MMMM yyyy", { locale: localeId })
+                      ) : (
+                        <span>Pilih tanggal akhir</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                      disabled={(date) =>
+                        dateFrom ? date < dateFrom : false
+                      }
+                    />
+                    {dateTo && (
+                      <div className="p-3 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setDateTo(undefined)}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Hapus Filter
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </div>
+
+          {/* Active Filters Summary */}
+          {(dateFrom || dateTo || filterDivision !== "all" || filterType !== "all") && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center flex-wrap gap-2">
+                  <span>Filter aktif:</span>
+                  {filterDivision !== "all" && (
+                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs">
+                      {filterDivision}
+                    </span>
+                  )}
+                  {filterType !== "all" && (
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs">
+                      {filterType === "check-in" ? "Absen Masuk" : "Absen Pulang"}
+                    </span>
+                  )}
+                  {dateFrom && (
+                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs">
+                      Dari: {format(dateFrom, "dd/MM/yyyy")}
+                    </span>
+                  )}
+                  {dateTo && (
+                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs">
+                      Sampai: {format(dateTo, "dd/MM/yyyy")}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFilterDivision("all");
+                    setFilterType("all");
+                    setDateFrom(undefined);
+                    setDateTo(undefined);
+                  }}
+                  className="text-xs"
+                >
+                  Reset Semua Filter
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

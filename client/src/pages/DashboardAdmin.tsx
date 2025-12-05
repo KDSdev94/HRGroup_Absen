@@ -375,7 +375,7 @@ export default function DashboardAdmin() {
           value={stats.lateToday}
           icon={Clock}
           color="#f59e0b"
-          subtext="Setelah 11:00 AM"
+          subtext="Setelah 09:00 WIB"
           onClick={() => setLocation("/attendance/late")}
         />
         <StatCard
@@ -453,7 +453,11 @@ export default function DashboardAdmin() {
                         </span>
                       </div>
                       <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        {activity.action}
+                        {activity.type === "check-in"
+                          ? `Sudah absen masuk`
+                          : activity.type === "check-out"
+                          ? `Sudah absen pulang`
+                          : activity.action}
                       </p>
                     </div>
                   </div>

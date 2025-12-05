@@ -377,9 +377,9 @@ export default function Scan() {
 
       // 3. Define flexible time windows (in WIB)
       const CHECK_IN_START = 7.5; // 07:30
-      const CHECK_IN_END = 11.5; // 11:30
-      const CHECK_OUT_START = 15.0; // 15:00 (3pm)
-      const CHECK_OUT_END = 22.0; // 22:00 (10pm) - extended time window
+      const CHECK_IN_END = 9.0; // 09:00
+      const CHECK_OUT_START = 15.5; // 15:30 (3:30pm)
+      const CHECK_OUT_END = 16.5; // 16:30 (4:30pm)
 
       // Check if employee has already checked in today
       const checkInQuery = query(
@@ -410,7 +410,7 @@ export default function Scan() {
         }
         if (currentTime > CHECK_IN_END) {
           throw new Error(
-            `Absen masuk sudah ditutup. Berakhir pukul 11:30 WIB.`
+            `Absen masuk sudah ditutup. Berakhir pukul 09:00 WIB.`
           );
         }
         attendanceType = "check-in";
@@ -419,19 +419,19 @@ export default function Scan() {
         // Check-in exists, no check-out yet - must be check-out time
         if (currentTime < CHECK_OUT_START) {
           throw new Error(
-            `Absen pulang belum dibuka. Dimulai pukul 15:00 WIB.`
+            `Absen pulang belum dibuka. Dimulai pukul 15:30 WIB.`
           );
         }
         if (currentTime > CHECK_OUT_END) {
           throw new Error(
-            `Absen pulang sudah ditutup. Berakhir pukul 22:00 WIB.`
+            `Absen pulang sudah ditutup. Berakhir pukul 16:30 WIB.`
           );
         }
         attendanceType = "check-out";
         successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
       } else {
         // Already checked out
-        throw new Error("Anda sudah melakukan absen pulang hari ini.");
+        throw new Error("Semoga Harimu Menyenangkan 🤗");
       }
 
       // Get Location - Try to get location but don't block attendance
