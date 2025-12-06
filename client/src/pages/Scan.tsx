@@ -388,7 +388,7 @@ export default function Scan() {
       if (day === 6) {
         // Saturday special hours
         CHECK_OUT_START = 11.5; // 11:30
-        CHECK_OUT_END = 12.5; // 12:30
+        CHECK_OUT_END = 13.0; // 13:00
       }
 
       // Check if employee has already checked in today
@@ -428,7 +428,7 @@ export default function Scan() {
       } else if (checkOutSnapshot.empty) {
         // Check-in exists, no check-out yet - must be check-out time
         const checkOutStartTime = day === 6 ? "11:30" : "15:30";
-        const checkOutEndTime = day === 6 ? "12:30" : "16:30";
+        const checkOutEndTime = day === 6 ? "13:00" : "16:30";
 
         if (currentTime < CHECK_OUT_START) {
           throw new Error(
