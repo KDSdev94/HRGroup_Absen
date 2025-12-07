@@ -35,11 +35,21 @@ export default function Scan() {
   const [expectedAttendanceType, setExpectedAttendanceType] = useState<
     "check-in" | "check-out" | null
   >(null);
+  const [isSunday, setIsSunday] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isInitializedRef = useRef(false);
   const isProcessingRef = useRef(false); // Immediate flag to prevent duplicate scans
   const { toast } = useToast();
+
+  // Check if it's Sunday on component mount
+  useEffect(() => {
+    const { day } = getWIBTime();
+    if (day === 0) {
+      setIsSunday(true);
+      setExpectedAttendanceType(null);
+    }
+  }, []);
 
   // Fetch logged-in user's employee ID
   useEffect(() => {
@@ -85,6 +95,17 @@ export default function Scan() {
   // Check today's attendance to determine expected type
   const checkTodayAttendance = async (employeeId: string) => {
     try {
+      // Check if today is Sunday first
+      const { day } = getWIBTime();
+      if (day === 0) {
+        // It's Sunday - disable attendance
+        setIsSunday(true);
+        setExpectedAttendanceType(null);
+        return;
+      }
+
+      setIsSunday(false);
+
       const today = new Date().toLocaleString("en-US", {
         timeZone: "Asia/Jakarta",
       });
@@ -648,7 +669,11 @@ export default function Scan() {
               {!isCameraActive && !processing && (
                 <div className="flex flex-col items-center gap-4 w-full max-w-sm">
                   {/* Status Badge */}
-                  {expectedAttendanceType && (
+                  {isSunday ? (
+                    <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-red-500/20 text-red-400 border border-red-500/30">
+                      🚫 Hari Minggu - Absensi Libur
+                    </div>
+                  ) : expectedAttendanceType ? (
                     <div
                       className={`px-4 py-2 rounded-full text-sm font-semibold mb-2 ${
                         expectedAttendanceType === "check-in"
@@ -660,9 +685,7 @@ export default function Scan() {
                         ? "🌅 Absen Masuk"
                         : "🌆 Absen Pulang"}
                     </div>
-                  )}
-
-                  {expectedAttendanceType === null && (
+                  ) : (
                     <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-gray-500/20 text-gray-400 border border-gray-500/30">
                       ✅ Absen Hari Ini Sudah Selesai
                     </div>
@@ -692,18 +715,27 @@ export default function Scan() {
                     onClick={startScanning}
                     size="lg"
                     className={`w-full text-base font-semibold ${
-                      expectedAttendanceType === "check-in"
+                      isSunday
+                        ? "bg-gray-500 cursor-not-allowed"
+                        : expectedAttendanceType === "check-in"
                         ? "bg-green-600 hover:bg-green-700"
                         : expectedAttendanceType === "check-out"
                         ? "bg-orange-600 hover:bg-orange-700"
                         : ""
                     }`}
-                    disabled={expectedAttendanceType === null || processing}
+                    disabled={
+                      isSunday || expectedAttendanceType === null || processing
+                    }
                   >
                     {processing ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Memulai Kamera...
+                      </>
+                    ) : isSunday ? (
+                      <>
+                        <AlertTriangle className="mr-2 h-5 w-5" />
+                        Absensi Tidak Tersedia (Hari Libur)
                       </>
                     ) : (
                       <>
