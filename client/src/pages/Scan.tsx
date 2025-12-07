@@ -735,7 +735,7 @@ export default function Scan() {
                     ) : isSunday ? (
                       <>
                         <AlertTriangle className="mr-2 h-5 w-5" />
-                        Absensi Tidak Tersedia (Hari Libur)
+                        Absens Gak Tersedia (Hari Libur)
                       </>
                     ) : (
                       <>
