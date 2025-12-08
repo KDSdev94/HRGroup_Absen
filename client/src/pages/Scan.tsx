@@ -397,8 +397,16 @@ export default function Scan() {
       }
 
       // 3. Define flexible time windows (in WIB)
-      const CHECK_IN_START = 7.5; // 07:30
-      const CHECK_IN_END = 9.0; // 09:00
+      // Monday (day === 1): 08:30 - 10:00
+      // Other days: 07:30 - 09:00
+      let CHECK_IN_START = 7.5; // 07:30 - default
+      let CHECK_IN_END = 9.0; // 09:00 - default
+
+      if (day === 1) {
+        // Monday special hours
+        CHECK_IN_START = 8.5; // 08:30
+        CHECK_IN_END = 10.0; // 10:00
+      }
 
       // Check-out time depends on day of week
       // Saturday (day === 6): 11:30 - 12:30
@@ -409,7 +417,7 @@ export default function Scan() {
       if (day === 6) {
         // Saturday special hours
         CHECK_OUT_START = 11.5; // 11:30
-        CHECK_OUT_END = 13.0; // 13:00
+        CHECK_OUT_END = 12.5; // 12:30
       }
 
       // Check if employee has already checked in today
@@ -436,12 +444,18 @@ export default function Scan() {
       // Determine what type of attendance is allowed based on time and existing records
       if (checkInSnapshot.empty) {
         // No check-in yet - must be check-in time
+        // Format time for error messages
+        const checkInStartTime = day === 1 ? "08:30" : "07:30";
+        const checkInEndTime = day === 1 ? "10:00" : "09:00";
+
         if (currentTime < CHECK_IN_START) {
-          throw new Error(`Absen masuk belum dibuka. Dimulai pukul 07:30 WIB.`);
+          throw new Error(
+            `Absen masuk belum dibuka. Dimulai pukul ${checkInStartTime} WIB.`
+          );
         }
         if (currentTime > CHECK_IN_END) {
           throw new Error(
-            `Absen masuk sudah ditutup. Berakhir pukul 09:00 WIB.`
+            `Absen masuk sudah ditutup. Berakhir pukul ${checkInEndTime} WIB.`
           );
         }
         attendanceType = "check-in";
@@ -449,7 +463,7 @@ export default function Scan() {
       } else if (checkOutSnapshot.empty) {
         // Check-in exists, no check-out yet - must be check-out time
         const checkOutStartTime = day === 6 ? "11:30" : "15:30";
-        const checkOutEndTime = day === 6 ? "13:00" : "16:30";
+        const checkOutEndTime = day === 6 ? "12:30" : "16:30";
 
         if (currentTime < CHECK_OUT_START) {
           throw new Error(
