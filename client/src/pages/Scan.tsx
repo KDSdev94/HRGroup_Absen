@@ -36,18 +36,25 @@ export default function Scan() {
     "check-in" | "check-out" | null
   >(null);
   const [isSunday, setIsSunday] = useState(false);
+  const [isWithinTimeWindow, setIsWithinTimeWindow] = useState(true);
+  const [timeMessage, setTimeMessage] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isInitializedRef = useRef(false);
   const isProcessingRef = useRef(false); // Immediate flag to prevent duplicate scans
   const { toast } = useToast();
 
-  // Check if it's Sunday on component mount
+  // Check if it's Sunday and time window on component mount
   useEffect(() => {
-    const { day } = getWIBTime();
+    const { day, hours, minutes } = getWIBTime();
     if (day === 0) {
       setIsSunday(true);
       setExpectedAttendanceType(null);
+      setIsWithinTimeWindow(false);
+      setTimeMessage(null);
+    } else {
+      setIsSunday(false);
+      // Check time window will be done in checkTodayAttendance
     }
   }, []);
 
@@ -101,6 +108,8 @@ export default function Scan() {
         // It's Sunday - disable attendance
         setIsSunday(true);
         setExpectedAttendanceType(null);
+        setIsWithinTimeWindow(false);
+        setTimeMessage(null);
         return;
       }
 
@@ -127,12 +136,76 @@ export default function Scan() {
       );
       const checkOutSnapshot = await getDocs(checkOutQuery);
 
+      // Check time window for check-in
+      const { hours, minutes } = getWIBTime();
+      const currentTime = hours + minutes / 60;
+
+      // Define check-in time windows
+      let CHECK_IN_START = 7.5; // 07:30 - default
+      let CHECK_IN_END = 9.0; // 09:00 - default
+
+      if (day === 1) {
+        // Monday special hours
+        CHECK_IN_START = 8.5; // 08:30
+        CHECK_IN_END = 10.0; // 10:00
+      }
+
       if (checkInSnapshot.empty) {
-        setExpectedAttendanceType("check-in");
+        // No check-in yet - check if within time window
+        if (currentTime < CHECK_IN_START) {
+          const startTime = day === 1 ? "08:30" : "07:30";
+          setIsWithinTimeWindow(false);
+          setTimeMessage(
+            `Absen masuk belum dibuka. Dimulai pukul ${startTime} WIB.`
+          );
+          setExpectedAttendanceType("check-in"); // Still set type but disable button
+        } else if (currentTime > CHECK_IN_END) {
+          const endTime = day === 1 ? "10:00" : "09:00";
+          setIsWithinTimeWindow(false);
+          setTimeMessage(
+            `Absen masuk sudah ditutup. Berakhir pukul ${endTime} WIB.`
+          );
+          setExpectedAttendanceType(null);
+        } else {
+          setIsWithinTimeWindow(true);
+          setTimeMessage(null);
+          setExpectedAttendanceType("check-in");
+        }
       } else if (checkOutSnapshot.empty) {
-        setExpectedAttendanceType("check-out");
+        // Check-in exists, check check-out time window
+        let CHECK_OUT_START = 15.5; // 15:30 - default
+        let CHECK_OUT_END = 16.5; // 16:30 - default
+
+        if (day === 6) {
+          // Saturday special hours
+          CHECK_OUT_START = 11.5; // 11:30
+          CHECK_OUT_END = 12.5; // 12:30
+        }
+
+        if (currentTime < CHECK_OUT_START) {
+          const startTime = day === 6 ? "11:30" : "15:30";
+          setIsWithinTimeWindow(false);
+          setTimeMessage(
+            `Absen pulang belum dibuka. Dimulai pukul ${startTime} WIB.`
+          );
+          setExpectedAttendanceType("check-out"); // Still set type but disable button
+        } else if (currentTime > CHECK_OUT_END) {
+          const endTime = day === 6 ? "12:30" : "16:30";
+          setIsWithinTimeWindow(false);
+          setTimeMessage(
+            `Absen pulang sudah ditutup. Berakhir pukul ${endTime} WIB.`
+          );
+          setExpectedAttendanceType(null);
+        } else {
+          setIsWithinTimeWindow(true);
+          setTimeMessage(null);
+          setExpectedAttendanceType("check-out");
+        }
       } else {
-        setExpectedAttendanceType(null); // Already done for today
+        // Already done for today
+        setIsWithinTimeWindow(false);
+        setTimeMessage(null);
+        setExpectedAttendanceType(null);
       }
     } catch (error) {
       console.error("Error checking attendance:", error);
@@ -687,6 +760,10 @@ export default function Scan() {
                     <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-red-500/20 text-red-400 border border-red-500/30">
                       🚫 Hari Minggu - Absensi Libur
                     </div>
+                  ) : timeMessage ? (
+                    <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                      ⏰ {timeMessage}
+                    </div>
                   ) : expectedAttendanceType ? (
                     <div
                       className={`px-4 py-2 rounded-full text-sm font-semibold mb-2 ${
@@ -729,7 +806,7 @@ export default function Scan() {
                     onClick={startScanning}
                     size="lg"
                     className={`w-full text-base font-semibold ${
-                      isSunday
+                      isSunday || !isWithinTimeWindow
                         ? "bg-gray-500 cursor-not-allowed"
                         : expectedAttendanceType === "check-in"
                         ? "bg-green-600 hover:bg-green-700"
@@ -738,7 +815,10 @@ export default function Scan() {
                         : ""
                     }`}
                     disabled={
-                      isSunday || expectedAttendanceType === null || processing
+                      isSunday ||
+                      !isWithinTimeWindow ||
+                      expectedAttendanceType === null ||
+                      processing
                     }
                   >
                     {processing ? (
@@ -750,6 +830,11 @@ export default function Scan() {
                       <>
                         <AlertTriangle className="mr-2 h-5 w-5" />
                         Absens Gak Tersedia (Hari Libur)
+                      </>
+                    ) : !isWithinTimeWindow ? (
+                      <>
+                        <AlertTriangle className="mr-2 h-5 w-5" />
+                        Belum Waktunya Scan
                       </>
                     ) : (
                       <>
