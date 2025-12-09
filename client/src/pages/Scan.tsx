@@ -142,12 +142,12 @@ export default function Scan() {
 
       // Define check-in time windows
       let CHECK_IN_START = 7.5; // 07:30 - default
-      let CHECK_IN_END = 9.5; // 09:30 - default for Tuesday-Friday
+      let CHECK_IN_END = 9.0; // 09:00 - default
 
       if (day === 1) {
         // Monday special hours
         CHECK_IN_START = 8.5; // 08:30
-        CHECK_IN_END = 10.0; // 10:00
+        CHECK_IN_END = 12.0; // 10:00
       }
 
       if (checkInSnapshot.empty) {
@@ -160,7 +160,7 @@ export default function Scan() {
           );
           setExpectedAttendanceType("check-in"); // Still set type but disable button
         } else if (currentTime > CHECK_IN_END) {
-          const endTime = day === 1 ? "10:00" : "09:30";
+          const endTime = day === 1 ? "12:00" : "09:00";
           setIsWithinTimeWindow(false);
           setTimeMessage(
             `Absen masuk sudah ditutup. Berakhir pukul ${endTime} WIB.`
@@ -471,10 +471,9 @@ export default function Scan() {
 
       // 3. Define flexible time windows (in WIB)
       // Monday (day === 1): 08:30 - 10:00
-      // Tuesday-Friday (day === 2-5): 07:30 - 09:30
-      // Saturday (day === 6): 07:30 - 09:30
+      // Other days: 07:30 - 09:00
       let CHECK_IN_START = 7.5; // 07:30 - default
-      let CHECK_IN_END = 9.5; // 09:30 - default for Tuesday-Friday
+      let CHECK_IN_END = 9.0; // 09:00 - default
 
       if (day === 1) {
         // Monday special hours
@@ -520,7 +519,7 @@ export default function Scan() {
         // No check-in yet - must be check-in time
         // Format time for error messages
         const checkInStartTime = day === 1 ? "08:30" : "07:30";
-        const checkInEndTime = day === 1 ? "10:00" : "09:30";
+        const checkInEndTime = day === 1 ? "10:00" : "09:00";
 
         if (currentTime < CHECK_IN_START) {
           throw new Error(
