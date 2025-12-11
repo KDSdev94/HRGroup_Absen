@@ -9,6 +9,8 @@ import {
   Loader2,
   Camera,
   Upload,
+  Zap,
+  ZapOff,
 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import {
@@ -38,6 +40,10 @@ export default function Scan() {
   const [isSunday, setIsSunday] = useState(false);
   const [isWithinTimeWindow, setIsWithinTimeWindow] = useState(true);
   const [timeMessage, setTimeMessage] = useState<string | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(
+    null
+  );
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isInitializedRef = useRef(false);
@@ -335,6 +341,18 @@ export default function Scan() {
 
     try {
       console.log("🛑 Stopping scanner...");
+      // Turn off torch if on
+      if (torchOn) {
+        try {
+          await scannerRef.current.applyVideoConstraints({
+            advanced: [{ torch: false } as any],
+          });
+          setTorchOn(false);
+        } catch (err) {
+          console.warn("Could not turn off torch:", err);
+        }
+      }
+
       await scannerRef.current.stop();
       setIsCameraActive(false);
       setIsScanning(false);
@@ -344,6 +362,51 @@ export default function Scan() {
       // Force reset state even if stop fails
       setIsCameraActive(false);
       setIsScanning(false);
+    }
+  };
+
+  // Toggle Flashlight
+  const toggleTorch = async () => {
+    if (!scannerRef.current || !isCameraActive) return;
+
+    try {
+      const newTorchState = !torchOn;
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ torch: newTorchState } as any],
+      });
+      setTorchOn(newTorchState);
+    } catch (error) {
+      console.error("Torch error:", error);
+      toast({
+        variant: "destructive",
+        title: "Fitur Tidak Tersedia",
+        description: "Flashlight tidak didukung di perangkat/browser ini.",
+      });
+    }
+  };
+
+  // Handle Tap to Focus
+  const handleTapToFocus = async (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!scannerRef.current || !isCameraActive) return;
+
+    // Visual feedback
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setFocusPoint({ x, y });
+
+    // Remove visual feedback after animation
+    setTimeout(() => setFocusPoint(null), 1000);
+
+    try {
+      // Attempt to trigger focus by re-applying continuous focus mode
+      // Note: Specific point focus (x,y) is not widely supported in WebRTC yet
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ focusMode: "continuous" } as any],
+      });
+      console.log("🎯 Focus triggered");
+    } catch (error) {
+      console.warn("Focus adjust not supported:", error);
     }
   };
 
@@ -750,12 +813,53 @@ export default function Scan() {
           {!scanResult ? (
             <div className="bg-black relative min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center text-white p-3 md:p-4">
               {/* Scanner Container */}
-              <div
-                id="reader"
-                className={`w-full rounded-lg overflow-hidden min-h-[300px] ${
-                  isCameraActive || processing ? "" : "hidden"
-                }`}
-              ></div>
+              <div className="relative w-full">
+                <div
+                  id="reader"
+                  className={`w-full rounded-lg overflow-hidden min-h-[300px] ${
+                    isCameraActive || processing ? "" : "hidden"
+                  }`}
+                ></div>
+
+                {/* Camera Overlays */}
+                {isCameraActive && !processing && (
+                  <>
+                    {/* Tap to Focus Area */}
+                    <div
+                      className="absolute inset-0 z-10 cursor-crosshair"
+                      onClick={handleTapToFocus}
+                    >
+                      {/* Focus Indicator */}
+                      {focusPoint && (
+                        <div
+                          className="absolute w-16 h-16 border-2 border-yellow-400 rounded-sm transform -translate-x-1/2 -translate-y-1/2 animate-ping pointer-events-none"
+                          style={{
+                            left: focusPoint.x,
+                            top: focusPoint.y,
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Flashlight Button */}
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-4 right-4 z-20 bg-black/50 text-white hover:bg-black/70 border border-white/20"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent focus trigger
+                        toggleTorch();
+                      }}
+                    >
+                      {torchOn ? (
+                        <Zap className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                      ) : (
+                        <ZapOff className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </>
+                )}
+              </div>
 
               {/* Controls - Show when camera is not active */}
               {!isCameraActive && !processing && (
