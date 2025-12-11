@@ -381,20 +381,45 @@ export default function AttendanceHistory() {
           `https://serpapi.com/search.json?engine=google_maps&q=${latitude},${longitude}&ll=@${latitude},${longitude},18z&api_key=${SERPAPI_KEY}`
         );
         const data = await response.json();
+        let fullAddress = "";
 
-        if (data.place_results) {
-          // Jika menemukan tempat spesifik (misal: "Pasar Batang")
-          const title = data.place_results.title;
-          const addr = data.place_results.address;
-          const fullAddress = `${title}, ${addr}`;
+        // Strategi: Cek local_results dulu karena biasanya berisi tempat spesifik di sekitar koordinat
+        if (data.local_results && data.local_results.length > 0) {
+          const place = data.local_results[0];
+          const title = place.title || "";
+          const addr = place.address || "";
 
+          if (addr.toLowerCase().includes(title.toLowerCase())) {
+            fullAddress = addr;
+          } else {
+            fullAddress = `${title}, ${addr}`;
+          }
+        }
+
+        // Jika tidak ada local_results, cek place_results (biasanya untuk alamat presisi/rumah)
+        if ((!fullAddress || fullAddress.length < 10) && data.place_results) {
+          const place = data.place_results;
+          const title = place.title || "";
+          const addr = place.address || place.formatted_address || "";
+
+          if (addr.toLowerCase().includes(title.toLowerCase())) {
+            fullAddress = addr;
+          } else {
+            fullAddress = `${title}, ${addr}`;
+          }
+        }
+
+        // Fallback terakhir ke data.address top level
+        if (!fullAddress && data.address) {
+          fullAddress = data.address;
+        }
+
+        // Clean up address
+        fullAddress = fullAddress.replace(/^, /, "").replace(/, $/, "").trim();
+
+        if (fullAddress && fullAddress.length > 5) {
           setLocationAddresses((prev) => ({ ...prev, [key]: fullAddress }));
           return fullAddress;
-        } else if (data.address) {
-          // Fallback jika hanya ada alamat
-          const address = data.address;
-          setLocationAddresses((prev) => ({ ...prev, [key]: address }));
-          return address;
         }
       } catch (error) {
         console.error("❌ SerpApi Error:", error);
