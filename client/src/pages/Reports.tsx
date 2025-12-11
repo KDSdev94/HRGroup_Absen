@@ -243,26 +243,44 @@ export default function Reports() {
     // 1. COBA PAKAI SERPAPI (Google Maps Data)
     if (SERPAPI_KEY) {
       try {
+        console.log(`🔍 Fetching SerpApi for ${latitude},${longitude}...`);
         // Note: Panggilan client-side ke SerpApi mungkin terkena masalah CORS di browser.
         // Idealnya ini dipanggil dari backend. Untuk testing development, kita coba fetch langsung.
         const response = await fetch(
           `https://serpapi.com/search.json?engine=google_maps&q=${latitude},${longitude}&ll=@${latitude},${longitude},18z&api_key=${SERPAPI_KEY}`
         );
         const data = await response.json();
+        console.log("📦 SerpApi Response:", data);
+
+        let fullAddress = "";
 
         if (data.place_results) {
-          // Jika menemukan tempat spesifik (misal: "Pasar Batang")
-          const title = data.place_results.title;
-          const addr = data.place_results.address;
-          const fullAddress = `${title}, ${addr}`;
+          const title = data.place_results.title || "";
+          const addr =
+            data.place_results.address ||
+            data.place_results.formatted_address ||
+            "";
 
+          // Jika title sudah ada di dalam address, jangan diulang
+          if (addr.toLowerCase().includes(title.toLowerCase())) {
+            fullAddress = addr;
+          } else {
+            fullAddress = `${title}, ${addr}`;
+          }
+        } else if (data.local_results && data.local_results.length > 0) {
+          // Fallback ke local results jika place_results kosong
+          const place = data.local_results[0];
+          fullAddress = `${place.title}, ${place.address || ""}`;
+        } else if (data.address) {
+          fullAddress = data.address;
+        }
+
+        // Clean up address
+        fullAddress = fullAddress.replace(/^, /, "").replace(/, $/, "").trim();
+
+        if (fullAddress && fullAddress.length > 5) {
           setLocationAddresses((prev) => ({ ...prev, [key]: fullAddress }));
           return fullAddress;
-        } else if (data.address) {
-          // Fallback jika hanya ada alamat
-          const address = data.address;
-          setLocationAddresses((prev) => ({ ...prev, [key]: address }));
-          return address;
         }
       } catch (error) {
         console.error("❌ SerpApi Error:", error);
@@ -326,8 +344,10 @@ export default function Reports() {
         else if (addr.town) parts.push(addr.town);
         else if (addr.county) parts.push(addr.county);
 
-        // 7. State / Province (Optional, maybe too long)
-        // if (addr.state) parts.push(addr.state);
+        // 7. State / Province (Wajib muncul)
+        if (addr.state) {
+          parts.push(addr.state);
+        }
       }
 
       // Filter duplicates and join
