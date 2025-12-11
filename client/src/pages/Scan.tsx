@@ -106,19 +106,16 @@ export default function Scan() {
       const { day } = getWIBTime();
       if (day === 0) {
         // It's Sunday - disable attendance
-        setIsSunday(true);
-        setExpectedAttendanceType(null);
-        setIsWithinTimeWindow(false);
-        setTimeMessage(null);
-        return;
+        // setIsSunday(true);
+        // setExpectedAttendanceType(null);
+        // setIsWithinTimeWindow(false);
+        // setTimeMessage(null);
+        // return;
       }
 
       setIsSunday(false);
 
-      const today = new Date().toLocaleString("en-US", {
-        timeZone: "Asia/Jakarta",
-      });
-      const dateString = new Date(today).toISOString().split("T")[0];
+      const { dateString } = getWIBTime();
 
       const checkInQuery = query(
         collection(db, "attendance"),
@@ -154,18 +151,28 @@ export default function Scan() {
         // No check-in yet - check if within time window
         if (currentTime < CHECK_IN_START) {
           const startTime = day === 1 ? "08:30" : "07:30";
-          setIsWithinTimeWindow(false);
-          setTimeMessage(
-            `Absen masuk belum dibuka. Dimulai pukul ${startTime} WIB.`
-          );
-          setExpectedAttendanceType("check-in"); // Still set type but disable button
+          // setIsWithinTimeWindow(false);
+          // setTimeMessage(
+          //   `Absen masuk belum dibuka. Dimulai pukul ${startTime} WIB.`
+          // );
+          // setExpectedAttendanceType("check-in"); // Still set type but disable button
+
+          // FORCE ENABLE FOR TESTING
+          setIsWithinTimeWindow(true);
+          setTimeMessage("Mode Testing: Absen Masuk Diizinkan (Diluar Jam)");
+          setExpectedAttendanceType("check-in");
         } else if (currentTime > CHECK_IN_END) {
           const endTime = day === 1 ? "12:00" : "09:00";
-          setIsWithinTimeWindow(false);
-          setTimeMessage(
-            `Absen masuk sudah ditutup. Berakhir pukul ${endTime} WIB.`
-          );
-          setExpectedAttendanceType(null);
+          // setIsWithinTimeWindow(false);
+          // setTimeMessage(
+          //   `Absen masuk sudah ditutup. Berakhir pukul ${endTime} WIB.`
+          // );
+          // setExpectedAttendanceType(null);
+
+          // FORCE ENABLE FOR TESTING
+          setIsWithinTimeWindow(true);
+          setTimeMessage("Mode Testing: Absen Masuk Diizinkan (Diluar Jam)");
+          setExpectedAttendanceType("check-in");
         } else {
           setIsWithinTimeWindow(true);
           setTimeMessage(null);
@@ -184,18 +191,28 @@ export default function Scan() {
 
         if (currentTime < CHECK_OUT_START) {
           const startTime = day === 6 ? "11:30" : "15:30";
-          setIsWithinTimeWindow(false);
-          setTimeMessage(
-            `Absen pulang belum dibuka. Dimulai pukul ${startTime} WIB.`
-          );
-          setExpectedAttendanceType("check-out"); // Still set type but disable button
+          // setIsWithinTimeWindow(false);
+          // setTimeMessage(
+          //   `Absen pulang belum dibuka. Dimulai pukul ${startTime} WIB.`
+          // );
+          // setExpectedAttendanceType("check-out"); // Still set type but disable button
+
+          // FORCE ENABLE FOR TESTING
+          setIsWithinTimeWindow(true);
+          setTimeMessage("Mode Testing: Absen Pulang Diizinkan (Diluar Jam)");
+          setExpectedAttendanceType("check-out");
         } else if (currentTime > CHECK_OUT_END) {
           const endTime = day === 6 ? "12:30" : "16:30";
-          setIsWithinTimeWindow(false);
-          setTimeMessage(
-            `Absen pulang sudah ditutup. Berakhir pukul ${endTime} WIB.`
-          );
-          setExpectedAttendanceType(null);
+          // setIsWithinTimeWindow(false);
+          // setTimeMessage(
+          //   `Absen pulang sudah ditutup. Berakhir pukul ${endTime} WIB.`
+          // );
+          // setExpectedAttendanceType(null);
+
+          // FORCE ENABLE FOR TESTING
+          setIsWithinTimeWindow(true);
+          setTimeMessage("Mode Testing: Absen Pulang Diizinkan (Diluar Jam)");
+          setExpectedAttendanceType("check-out");
         } else {
           setIsWithinTimeWindow(true);
           setTimeMessage(null);
@@ -203,9 +220,15 @@ export default function Scan() {
         }
       } else {
         // Already done for today
-        setIsWithinTimeWindow(false);
-        setTimeMessage(null);
-        setExpectedAttendanceType(null);
+        // Already done for today
+        // setIsWithinTimeWindow(false);
+        // setTimeMessage(null);
+        // setExpectedAttendanceType(null);
+
+        // FORCE ENABLE FOR TESTING
+        setIsWithinTimeWindow(true);
+        setTimeMessage("Mode Testing: Absen Ulang Diizinkan");
+        setExpectedAttendanceType("check-in");
       }
     } catch (error) {
       console.error("Error checking attendance:", error);
@@ -248,6 +271,8 @@ export default function Scan() {
     }
 
     setProcessing(true);
+    // Give React time to render the visible container so html5-qrcode can attach correctly
+    await new Promise((resolve) => setTimeout(resolve, 100));
     console.log("🎥 Starting camera...");
 
     try {
@@ -385,12 +410,17 @@ export default function Scan() {
     const now = new Date();
     const wibString = now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
     const wibDate = new Date(wibString);
+    const year = wibDate.getFullYear();
+    const month = String(wibDate.getMonth() + 1).padStart(2, "0");
+    const dayDate = String(wibDate.getDate()).padStart(2, "0");
+    const dateString = `${year}-${month}-${dayDate}`;
+
     return {
       date: wibDate,
       day: wibDate.getDay(), // 0 = Sunday, 1 = Monday, ...
       hours: wibDate.getHours(),
       minutes: wibDate.getMinutes(),
-      dateString: wibDate.toISOString().split("T")[0],
+      dateString: dateString,
     };
   };
 
@@ -460,14 +490,14 @@ export default function Scan() {
       });
 
       // 1. Check Sunday
-      if (day === 0) {
-        throw new Error("Absensi libur pada hari Minggu.");
-      }
+      // if (day === 0) {
+      //   throw new Error("Absensi libur pada hari Minggu.");
+      // }
 
       // 2. Check Holidays
-      if (HOLIDAYS.includes(dateString)) {
-        throw new Error("Absensi libur pada tanggal merah.");
-      }
+      // if (HOLIDAYS.includes(dateString)) {
+      //   throw new Error("Absensi libur pada tanggal merah.");
+      // }
 
       // 3. Define flexible time windows (in WIB)
       // Monday (day === 1): 08:30 - 10:00
@@ -522,14 +552,16 @@ export default function Scan() {
         const checkInEndTime = day === 1 ? "10:00" : "09:00";
 
         if (currentTime < CHECK_IN_START) {
-          throw new Error(
-            `Absen masuk belum dibuka. Dimulai pukul ${checkInStartTime} WIB.`
-          );
+          // throw new Error(
+          //   `Absen masuk belum dibuka. Dimulai pukul ${checkInStartTime} WIB.`
+          // );
+          console.log("Testing Mode: Allowing early check-in");
         }
         if (currentTime > CHECK_IN_END) {
-          throw new Error(
-            `Absen masuk sudah ditutup. Berakhir pukul ${checkInEndTime} WIB.`
-          );
+          // throw new Error(
+          //   `Absen masuk sudah ditutup. Berakhir pukul ${checkInEndTime} WIB.`
+          // );
+          console.log("Testing Mode: Allowing late check-in");
         }
         attendanceType = "check-in";
         successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
@@ -539,14 +571,16 @@ export default function Scan() {
         const checkOutEndTime = day === 6 ? "12:30" : "16:30";
 
         if (currentTime < CHECK_OUT_START) {
-          throw new Error(
-            `Absen pulang belum dibuka. Dimulai pukul ${checkOutStartTime} WIB.`
-          );
+          // throw new Error(
+          //   `Absen pulang belum dibuka. Dimulai pukul ${checkOutStartTime} WIB.`
+          // );
+          console.log("Testing Mode: Allowing early check-out");
         }
         if (currentTime > CHECK_OUT_END) {
-          throw new Error(
-            `Absen pulang sudah ditutup. Berakhir pukul ${checkOutEndTime} WIB.`
-          );
+          // throw new Error(
+          //   `Absen pulang sudah ditutup. Berakhir pukul ${checkOutEndTime} WIB.`
+          // );
+          console.log("Testing Mode: Allowing late check-out");
         }
         attendanceType = "check-out";
         successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
@@ -748,7 +782,7 @@ export default function Scan() {
               <div
                 id="reader"
                 className={`w-full rounded-lg overflow-hidden min-h-[300px] ${
-                  isCameraActive ? "" : "hidden"
+                  isCameraActive || processing ? "" : "hidden"
                 }`}
               ></div>
 

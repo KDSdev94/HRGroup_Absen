@@ -333,7 +333,10 @@ export default function DashboardEmployee() {
         <div className="h-8 sm:h-10 bg-gray-200 rounded animate-pulse" />
         <div className="grid gap-3 sm:gap-4 grid-cols-1">
           {[1, 2].map((i) => (
-            <div key={i} className="h-32 sm:h-40 bg-gray-200 rounded animate-pulse" />
+            <div
+              key={i}
+              className="h-32 sm:h-40 bg-gray-200 rounded animate-pulse"
+            />
           ))}
         </div>
       </div>
@@ -423,7 +426,9 @@ export default function DashboardEmployee() {
       >
         <CardHeader className="px-5 sm:px-6 py-5 sm:py-6">
           <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <span className="text-lg sm:text-xl font-bold">Status Kehadiran Hari Ini</span>
+            <span className="text-lg sm:text-xl font-bold">
+              Status Kehadiran Hari Ini
+            </span>
             <span
               className={`text-xs sm:text-sm font-bold px-4 sm:px-5 py-2 sm:py-2.5 rounded-full whitespace-nowrap ${statusColor.bg} ${statusColor.text} shadow-sm`}
             >
@@ -434,13 +439,17 @@ export default function DashboardEmployee() {
         <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6">
           <div className="grid grid-cols-2 gap-4 sm:gap-6">
             <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 font-medium">Jam Masuk</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 font-medium">
+                Jam Masuk
+              </p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 {formatTime(employeeStats.checkInTime)}
               </p>
             </div>
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 font-medium">Jam Keluar</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 font-medium">
+                Jam Keluar
+              </p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 {formatTime(employeeStats.checkOutTime)}
               </p>
@@ -454,8 +463,18 @@ export default function DashboardEmployee() {
         <CardHeader className="px-5 sm:px-6 py-5 sm:py-6 border-b">
           <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
             <div className="rounded-lg p-2 bg-primary/10">
-              <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              <svg
+                className="h-5 w-5 text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
               </svg>
             </div>
             Kehadiran 7 Hari Terakhir
@@ -464,8 +483,18 @@ export default function DashboardEmployee() {
         <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 sm:pt-5">
           {recentAttendance.length === 0 ? (
             <div className="text-sm text-gray-500 text-center py-8 sm:py-12">
-              <svg className="h-12 w-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              <svg
+                className="h-12 w-12 mx-auto mb-3 text-gray-300"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
               </svg>
               <p>Belum ada data kehadiran.</p>
             </div>
@@ -478,8 +507,16 @@ export default function DashboardEmployee() {
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="rounded-lg p-2 bg-white dark:bg-gray-700 shadow-sm">
-                      <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <svg
+                        className="h-4 w-4 text-green-600 dark:text-green-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     </div>
                     <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">

@@ -40,7 +40,15 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { Download, FileSpreadsheet, MapPin, Eye, Trash2, CalendarIcon, X } from "lucide-react";
+import {
+  Download,
+  FileSpreadsheet,
+  MapPin,
+  Eye,
+  Trash2,
+  CalendarIcon,
+  X,
+} from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -78,6 +86,11 @@ const OFFICE_LOCATION = {
   latitude: -6.175392,
   longitude: 106.827153,
 };
+
+// --- KONFIGURASI SERPAPI (GOOGLE MAPS ENGINE) ---
+// Menggunakan SerpApi untuk mendapatkan data presisi dari Google Maps
+const SERPAPI_KEY =
+  "4c37835c05a346b06072180220ca7fa43820c61c3248b2e462a5a419dfde1b91";
 
 const MAX_DISTANCE_METERS = 100; // 100 meters radius
 
@@ -188,30 +201,30 @@ export default function Reports() {
     if (filterDivision !== "all" && record.division !== filterDivision) {
       return false;
     }
-    
+
     // Filter by type (check-in / check-out)
     if (filterType !== "all" && record.type !== filterType) {
       return false;
     }
-    
+
     // Filter by date range
     if (dateFrom || dateTo) {
       const recordDate = new Date(record.date);
       recordDate.setHours(0, 0, 0, 0); // Reset time to compare dates only
-      
+
       if (dateFrom) {
         const fromDate = new Date(dateFrom);
         fromDate.setHours(0, 0, 0, 0);
         if (recordDate < fromDate) return false;
       }
-      
+
       if (dateTo) {
         const toDate = new Date(dateTo);
         toDate.setHours(0, 0, 0, 0);
         if (recordDate > toDate) return false;
       }
     }
-    
+
     return true;
   });
 
@@ -227,6 +240,37 @@ export default function Reports() {
       return locationAddresses[key];
     }
 
+    // 1. COBA PAKAI SERPAPI (Google Maps Data)
+    if (SERPAPI_KEY) {
+      try {
+        // Note: Panggilan client-side ke SerpApi mungkin terkena masalah CORS di browser.
+        // Idealnya ini dipanggil dari backend. Untuk testing development, kita coba fetch langsung.
+        const response = await fetch(
+          `https://serpapi.com/search.json?engine=google_maps&q=${latitude},${longitude}&ll=@${latitude},${longitude},18z&api_key=${SERPAPI_KEY}`
+        );
+        const data = await response.json();
+
+        if (data.place_results) {
+          // Jika menemukan tempat spesifik (misal: "Pasar Batang")
+          const title = data.place_results.title;
+          const addr = data.place_results.address;
+          const fullAddress = `${title}, ${addr}`;
+
+          setLocationAddresses((prev) => ({ ...prev, [key]: fullAddress }));
+          return fullAddress;
+        } else if (data.address) {
+          // Fallback jika hanya ada alamat
+          const address = data.address;
+          setLocationAddresses((prev) => ({ ...prev, [key]: address }));
+          return address;
+        }
+      } catch (error) {
+        console.error("❌ SerpApi Error:", error);
+        // Lanjut ke fallback OpenStreetMap jika error
+      }
+    }
+
+    // 2. FALLBACK: OPENSTREETMAP (Gratis)
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
@@ -239,63 +283,64 @@ export default function Reports() {
       const data = await response.json();
 
       // Build accurate address from detailed components
-      let addressParts: string[] = [];
-      
+      const parts: string[] = [];
+
       if (data.address) {
         const addr = data.address;
-        
-        // Road/street information (most specific)
+
+        // 1. Specific Place Name (POI/Building)
+        // "Pasar Batang" might be an amenity or building name
+        if (addr.amenity) parts.push(addr.amenity);
+        else if (addr.building) parts.push(addr.building);
+        else if (addr.shop) parts.push(addr.shop);
+        else if (addr.tourism) parts.push(addr.tourism);
+        else if (addr.leisure) parts.push(addr.leisure);
+
+        // 2. Road / Street
+        // "Jl Yos Sudarso"
         if (addr.road) {
-          addressParts.push(addr.road);
+          parts.push(addr.road);
         } else if (addr.pedestrian) {
-          addressParts.push(addr.pedestrian);
-        } else if (addr.footway) {
-          addressParts.push(addr.footway);
+          parts.push(addr.pedestrian);
         }
-        
-        // Building/house number
-        if (addr.house_number) {
-          addressParts[addressParts.length - 1] = 
-            `${addr.house_number} ${addressParts[addressParts.length - 1] || ''}`.trim();
+
+        // 3. House Number
+        if (addr.house_number && parts.length > 0) {
+          // Append to the last part (usually road)
+          parts[parts.length - 1] += ` No. ${addr.house_number}`;
         }
-        
-        // Neighbourhood/suburb/village
-        if (addr.neighbourhood) {
-          addressParts.push(addr.neighbourhood);
-        } else if (addr.suburb) {
-          addressParts.push(addr.suburb);
-        } else if (addr.village) {
-          addressParts.push(addr.village);
-        } else if (addr.hamlet) {
-          addressParts.push(addr.hamlet);
-        }
-        
-        // City/town/district
-        if (addr.city) {
-          addressParts.push(addr.city);
-        } else if (addr.town) {
-          addressParts.push(addr.town);
-        } else if (addr.municipality) {
-          addressParts.push(addr.municipality);
-        } else if (addr.city_district) {
-          addressParts.push(addr.city_district);
-        }
-        
-        // State/province
-        if (addr.state) {
-          addressParts.push(addr.state);
-        }
-        
-        // Country
-        if (addr.country) {
-          addressParts.push(addr.country);
-        }
+
+        // 4. Village / Kelurahan / Neighbourhood (Most specific area)
+        // "Pasar Batang" might be a village
+        if (addr.village) parts.push(addr.village);
+        else if (addr.neighbourhood) parts.push(addr.neighbourhood);
+        else if (addr.hamlet) parts.push(addr.hamlet);
+
+        // 5. Suburb / District / Kecamatan
+        // "Pesanggrahan" might be here
+        if (addr.suburb) parts.push(addr.suburb);
+        else if (addr.city_district) parts.push(addr.city_district);
+
+        // 6. City / Regency
+        if (addr.city) parts.push(addr.city);
+        else if (addr.town) parts.push(addr.town);
+        else if (addr.county) parts.push(addr.county);
+
+        // 7. State / Province (Optional, maybe too long)
+        // if (addr.state) parts.push(addr.state);
       }
-      
-      // If we couldn't build address from components, use display_name as fallback
-      const address = addressParts.length > 0 
-        ? addressParts.join(", ")
-        : data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
+      // Filter duplicates and join
+      // Sometimes village and suburb are the same
+      const uniqueParts = parts.filter(
+        (item, index) => parts.indexOf(item) === index
+      );
+
+      const address =
+        uniqueParts.length > 0
+          ? uniqueParts.join(", ")
+          : data.display_name ||
+            `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 
       // Cache the address
       setLocationAddresses((prev) => ({ ...prev, [key]: address }));
@@ -589,9 +634,7 @@ export default function Reports() {
                       selected={dateTo}
                       onSelect={setDateTo}
                       initialFocus
-                      disabled={(date) =>
-                        dateFrom ? date < dateFrom : false
-                      }
+                      disabled={(date) => (dateFrom ? date < dateFrom : false)}
                     />
                     {dateTo && (
                       <div className="p-3 border-t">
@@ -613,7 +656,10 @@ export default function Reports() {
           </div>
 
           {/* Active Filters Summary */}
-          {(dateFrom || dateTo || filterDivision !== "all" || filterType !== "all") && (
+          {(dateFrom ||
+            dateTo ||
+            filterDivision !== "all" ||
+            filterType !== "all") && (
             <div className="mt-4 pt-4 border-t">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center flex-wrap gap-2">
@@ -625,7 +671,9 @@ export default function Reports() {
                   )}
                   {filterType !== "all" && (
                     <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs">
-                      {filterType === "check-in" ? "Absen Masuk" : "Absen Pulang"}
+                      {filterType === "check-in"
+                        ? "Absen Masuk"
+                        : "Absen Pulang"}
                     </span>
                   )}
                   {dateFrom && (
