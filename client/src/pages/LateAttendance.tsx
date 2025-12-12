@@ -29,20 +29,28 @@ export default function LateAttendance() {
   const [lateRecords, setLateRecords] = useState<LateRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Get date from URL query parameter or default to today
+  const getInitialDate = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("date") || new Date().toISOString().split("T")[0];
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getInitialDate);
+
   useEffect(() => {
     fetchLateAttendance();
-  }, []);
+  }, [selectedDate]);
 
   const fetchLateAttendance = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString().split("T")[0];
+      const targetDate = selectedDate;
 
-      // Fetch all check-in attendance for today
+      // Fetch all check-in attendance for the selected date
       const attendanceSnapshot = await getDocs(
         query(
           collection(db, "attendance"),
-          where("date", "==", today),
+          where("date", "==", targetDate),
           where("type", "==", "check-in")
         )
       );
@@ -179,13 +187,26 @@ export default function LateAttendance() {
         >
           <ArrowLeft className="h-4 w-4" /> Kembali
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             Peserta Terlambat Hari Ini
           </h1>
-          <p className="text-gray-500 mt-2">
-            Daftar peserta yang check-in setelah pukul 11:00 WIB
-          </p>
+          <div className="flex items-center justify-between gap-4 mt-2">
+            <p className="text-gray-500">
+              Daftar peserta yang check-in setelah pukul 11:00 WIB
+            </p>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500 dark:text-gray-400">
+                Filter Tanggal:
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-2 py-1 rounded border bg-white dark:bg-gray-800 text-sm"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
