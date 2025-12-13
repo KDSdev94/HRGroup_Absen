@@ -39,18 +39,23 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import QRCodeLib from "qrcode";
 
 interface Employee {
   id: string;
   employeeId: string;
   name: string;
   division: string;
+  batch?: string;
 }
 
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDivision, setFilterDivision] = useState("all");
+  const [filterBatch, setFilterBatch] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -58,6 +63,7 @@ export default function Employees() {
     null
   );
   const [loading, setLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
 
   // Form State
@@ -65,6 +71,7 @@ export default function Employees() {
     employeeId: "",
     name: "",
     division: "",
+    batch: "",
   });
 
   const DIVISIONS = [
@@ -78,6 +85,8 @@ export default function Employees() {
     "Content Creative",
     "Marketing",
   ];
+
+  const BATCHES = ["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5"];
 
   useEffect(() => {
     fetchEmployees();
@@ -133,6 +142,7 @@ export default function Employees() {
         employeeId: formData.employeeId,
         name: formData.name,
         division: formData.division,
+        batch: formData.batch,
       });
 
       // Log activity
@@ -148,7 +158,7 @@ export default function Employees() {
         description: `${formData.name} berhasil ditambahkan.`,
       });
       setIsAddOpen(false);
-      setFormData({ employeeId: "", name: "", division: "" });
+      setFormData({ employeeId: "", name: "", division: "", batch: "" });
       fetchEmployees();
     } catch (error) {
       toast({
@@ -165,6 +175,7 @@ export default function Employees() {
       employeeId: emp.employeeId || emp.id,
       name: emp.name,
       division: emp.division,
+      batch: emp.batch || "",
     });
     setIsEditOpen(true);
   };
@@ -180,6 +191,7 @@ export default function Employees() {
       await updateDoc(employeeRef, {
         name: formData.name,
         division: formData.division,
+        batch: formData.batch,
         // Note: employeeId (document ID) cannot be changed easily in Firestore
       });
 
@@ -190,6 +202,9 @@ export default function Employees() {
       }
       if (oldData?.division !== formData.division) {
         changes.push(`divisi: ${oldData?.division} → ${formData.division}`);
+      }
+      if (oldData?.batch !== formData.batch) {
+        changes.push(`batch: ${oldData?.batch} → ${formData.batch}`);
       }
 
       await logActivity(
@@ -204,7 +219,8 @@ export default function Employees() {
         description: "Data peserta berhasil diperbarui.",
       });
       setIsEditOpen(false);
-      setFormData({ employeeId: "", name: "", division: "" });
+      setIsEditOpen(false);
+      setFormData({ employeeId: "", name: "", division: "", batch: "" });
       setEditingId(null);
       fetchEmployees();
     } catch (error) {
@@ -240,7 +256,9 @@ export default function Employees() {
     const matchesDivision =
       filterDivision === "all" || emp.division === filterDivision;
 
-    return matchesSearch && matchesDivision;
+    const matchesBatch = filterBatch === "all" || emp.batch === filterBatch;
+
+    return matchesSearch && matchesDivision && matchesBatch;
   });
 
   const downloadQR = () => {
@@ -261,6 +279,84 @@ export default function Employees() {
         downloadLink.click();
       };
       img.src = "data:image/svg+xml;base64," + btoa(svgData);
+    }
+  };
+
+  const downloadBatchQR = async () => {
+    if (filterBatch === "all") {
+      toast({
+        variant: "destructive",
+        title: "Pilih Batch",
+        description:
+          "Silakan pilih batch terlebih dahulu pada filter untuk mengunduh semua QR Code dalam batch tersebut.",
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(filterBatch);
+
+      // Filter employees strictly by the selected batch, ignoring other filters
+      const batchEmployees = employees.filter(
+        (emp) => emp.batch === filterBatch
+      );
+
+      if (batchEmployees.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Data Kosong",
+          description: "Tidak ada peserta di batch ini.",
+        });
+        setIsDownloading(false);
+        return;
+      }
+
+      const promises = batchEmployees.map(async (emp) => {
+        const qrData = JSON.stringify({
+          id: emp.id,
+          name: emp.name,
+          division: emp.division,
+          batch: emp.batch,
+        });
+
+        // Generate QR as Data URL
+        const url = await QRCodeLib.toDataURL(qrData, {
+          width: 400,
+          margin: 2,
+          errorCorrectionLevel: "H",
+        });
+
+        // Remove header "data:image/png;base64,"
+        const base64Data = url.split(",")[1];
+
+        // Add to zip
+        // Filename: Name - ID.png
+        const safeName = emp.name.replace(/[^a-z0-9]/gi, "_").trim();
+        folder?.file(`${safeName}_${emp.employeeId}.png`, base64Data, {
+          base64: true,
+        });
+      });
+
+      await Promise.all(promises);
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `QR_Codes_${filterBatch}.zip`);
+
+      toast({
+        title: "Berhasil",
+        description: `QR Code untuk ${filterBatch} berhasil diunduh (${batchEmployees.length} peserta).`,
+      });
+    } catch (error) {
+      console.error("Error generating zip:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Gagal mengunduh ZIP QR Code.",
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -329,6 +425,26 @@ export default function Employees() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Batch</Label>
+                <Select
+                  value={formData.batch}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, batch: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BATCHES.map((batch) => (
+                      <SelectItem key={batch} value={batch}>
+                        {batch}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <DialogFooter>
                 <Button type="submit">Simpan Peserta</Button>
               </DialogFooter>
@@ -385,6 +501,26 @@ export default function Employees() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Batch</Label>
+              <Select
+                value={formData.batch}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, batch: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BATCHES.map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <DialogFooter>
               <Button type="submit">Perbarui Peserta</Button>
             </DialogFooter>
@@ -417,6 +553,36 @@ export default function Employees() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex gap-2 w-full md:w-auto">
+              <Select value={filterBatch} onValueChange={setFilterBatch}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Semua Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Batch</SelectItem>
+                  {BATCHES.map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                onClick={downloadBatchQR}
+                disabled={filterBatch === "all" || isDownloading}
+                className="whitespace-nowrap"
+              >
+                {isDownloading ? (
+                  "Generating..."
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    ZIP Batch
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -426,6 +592,7 @@ export default function Employees() {
                 <TableHead>ID Peserta</TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead>Divisi</TableHead>
+                <TableHead>Batch</TableHead>
                 <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
@@ -456,6 +623,7 @@ export default function Employees() {
                     </TableCell>
                     <TableCell className="font-medium">{emp.name}</TableCell>
                     <TableCell>{emp.division}</TableCell>
+                    <TableCell>{emp.batch || "-"}</TableCell>
                     <TableCell className="flex gap-2">
                       <Dialog>
                         <DialogTrigger asChild>
@@ -480,6 +648,7 @@ export default function Employees() {
                                   id: emp.id,
                                   name: emp.name,
                                   division: emp.division,
+                                  batch: emp.batch,
                                 })}
                                 size={200}
                               />

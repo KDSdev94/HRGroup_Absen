@@ -101,7 +101,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   const employeesSnapshot = await getDocs(
                     query(
                       collection(db, "employees"),
-                      where("userId", "==", currentUser.uid)
+                      where("uid", "==", currentUser.uid)
                     )
                   );
 

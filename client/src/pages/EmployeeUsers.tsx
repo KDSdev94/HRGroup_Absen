@@ -42,6 +42,7 @@ interface EmployeeUser {
   // Employee data
   name?: string;
   division?: string;
+  batch?: string;
 }
 
 export default function EmployeeUsers() {
@@ -49,6 +50,7 @@ export default function EmployeeUsers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDivision, setFilterDivision] = useState("all");
+  const [filterBatch, setFilterBatch] = useState("all");
   const { toast } = useToast();
 
   const DIVISIONS = [
@@ -62,6 +64,8 @@ export default function EmployeeUsers() {
     "Content Creative",
     "Marketing",
   ];
+
+  const BATCHES = ["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5"];
 
   useEffect(() => {
     fetchEmployeeUsers();
@@ -94,6 +98,7 @@ export default function EmployeeUsers() {
                   ...user,
                   name: empData.name,
                   division: empData.division,
+                  batch: empData.batch,
                 };
               }
             } catch (error) {
@@ -191,7 +196,9 @@ export default function EmployeeUsers() {
     const matchesDivision =
       filterDivision === "all" || user.division === filterDivision;
 
-    return matchesSearch && matchesDivision;
+    const matchesBatch = filterBatch === "all" || user.batch === filterBatch;
+
+    return matchesSearch && matchesDivision && matchesBatch;
   });
 
   return (
@@ -230,6 +237,19 @@ export default function EmployeeUsers() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={filterBatch} onValueChange={setFilterBatch}>
+          <SelectTrigger className="w-full md:w-[200px]">
+            <SelectValue placeholder="Semua Batch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Batch</SelectItem>
+            {BATCHES.map((batch) => (
+              <SelectItem key={batch} value={batch}>
+                {batch}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Users Table */}
@@ -259,6 +279,7 @@ export default function EmployeeUsers() {
                     <TableHead>Email</TableHead>
                     <TableHead>ID Peserta</TableHead>
                     <TableHead>Divisi</TableHead>
+                    <TableHead>Batch</TableHead>
                     <TableHead>Terdaftar</TableHead>
                     <TableHead>Aksi</TableHead>
                   </TableRow>
@@ -285,6 +306,9 @@ export default function EmployeeUsers() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">{user.division || "-"}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{user.batch || "-"}</span>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
                         {formatDateTable(user.createdAt)}
