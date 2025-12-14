@@ -11,7 +11,7 @@ import { getStorage, connectStorageEmulator } from "firebase/storage";
 // ⚠️ WARNING: HARDCODED CREDENTIALS - NOT SECURE!
 // TODO: Move these to .env.local for production
 // This is a temporary solution for development only
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBDfugpjTuTfZXt7GYO-TOWpw5aQvOTdxc",
   authDomain: "absensi-app-b623f.firebaseapp.com",
   databaseURL:

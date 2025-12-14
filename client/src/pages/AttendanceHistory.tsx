@@ -54,7 +54,15 @@ interface AttendanceRecord {
   location?: {
     latitude: number;
     longitude: number;
-    address?: string; // Add address field
+    accuracy?: number | null;
+    obtained?: boolean;
+    // Address fields from Firebase
+    address?: string | null;
+    street?: string | null;
+    district?: string | null;
+    city?: string | null;
+    province?: string | null;
+    postalCode?: string | null;
   };
 }
 
@@ -103,14 +111,53 @@ export default function AttendanceHistory() {
     const fetchAddresses = async () => {
       for (const record of records) {
         if (record.location && !recordAddresses[record.id]) {
-          const address = await getAddressFromCoordinates(
-            record.location.latitude,
-            record.location.longitude
-          );
-          setRecordAddresses((prev) => ({
-            ...prev,
-            [record.id]: address,
-          }));
+          // PRIORITAS 1: Gunakan alamat yang sudah tersimpan di Firebase
+          if (record.location.address) {
+            setRecordAddresses((prev) => ({
+              ...prev,
+              [record.id]: record.location!.address!,
+            }));
+            console.log(
+              `✅ Using stored address for ${record.id}:`,
+              record.location.address
+            );
+          }
+          // PRIORITAS 2: Jika tidak ada alamat, coba build dari komponen
+          else if (
+            record.location.city ||
+            record.location.street ||
+            record.location.district
+          ) {
+            const parts = [
+              record.location.street,
+              record.location.district,
+              record.location.city,
+              record.location.province,
+            ].filter(Boolean);
+            const builtAddress = parts.join(", ");
+            setRecordAddresses((prev) => ({
+              ...prev,
+              [record.id]: builtAddress,
+            }));
+            console.log(
+              `✅ Built address from components for ${record.id}:`,
+              builtAddress
+            );
+          }
+          // PRIORITAS 3: Fallback ke reverse geocoding (untuk data lama)
+          else {
+            console.log(
+              `⚠️ No stored address, fetching via reverse geocoding for ${record.id}`
+            );
+            const address = await getAddressFromCoordinates(
+              record.location.latitude,
+              record.location.longitude
+            );
+            setRecordAddresses((prev) => ({
+              ...prev,
+              [record.id]: address,
+            }));
+          }
         }
       }
     };

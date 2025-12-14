@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Users,
   Clock,
@@ -7,9 +7,9 @@ import {
   XCircle,
   Activity,
   TrendingUp,
-} from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { useLocation } from 'wouter';
+} from "lucide-react";
+import { db } from "@/lib/firebase";
+import { useLocation } from "wouter";
 import {
   collection,
   query,
@@ -17,39 +17,39 @@ import {
   getDocs,
   orderBy,
   limit,
-} from 'firebase/firestore';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+} from "firebase/firestore";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Activity {
   id: string;
   employeeName: string;
   action: string;
-  type: 'check-in' | 'check-out' | 'add-employee' | 'edit-employee';
+  type: "check-in" | "check-out" | "add-employee" | "edit-employee";
   timestamp: string;
   division?: string;
 }
 
 const DIVISION_COLORS: { [key: string]: string } = {
-  'Akuntansi & Keuangan': '#3b82f6',
-  Teknik: '#ef4444',
-  HRD: '#10b981',
-  Legal: '#f59e0b',
-  'Design Grafis': '#8b5cf6',
-  'Marketing & Sosmed': '#ec4899',
-  'Administrasi Pemberkasan': '#14b8a6',
-  'Content Creative': '#f97316',
-  Marketing: '#6366f1',
+  "Akuntansi & Keuangan": "#3b82f6",
+  Teknik: "#ef4444",
+  HRD: "#10b981",
+  Legal: "#f59e0b",
+  "Design Grafis": "#8b5cf6",
+  "Marketing & Sosmed": "#ec4899",
+  "Administrasi Pemberkasan": "#14b8a6",
+  "Content Creative": "#f97316",
+  Marketing: "#6366f1",
 };
 
 const COLORS = [
-  '#3b82f6',
-  '#ef4444',
-  '#10b981',
-  '#f59e0b',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
+  "#3b82f6",
+  "#ef4444",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
 ];
 
 export default function DashboardAdmin() {
@@ -65,7 +65,7 @@ export default function DashboardAdmin() {
   const [loadingStats, setLoadingStats] = useState(true);
   // Selected date for filtering (YYYY-MM-DD). Default to today.
   const [selectedDate, setSelectedDate] = useState(
-    () => new Date().toISOString().split('T')[0]
+    () => new Date().toISOString().split("T")[0]
   );
 
   useEffect(() => {
@@ -73,21 +73,21 @@ export default function DashboardAdmin() {
   }, [selectedDate]);
 
   const fetchAllData = async () => {
-    console.log('🔄 DashboardAdmin: Starting fetchAllData');
+    console.log("🔄 DashboardAdmin: Starting fetchAllData");
     try {
       // Fetch employees
-      console.log('📊 Fetching employees from Firestore...');
-      const employeesSnapshot = await getDocs(collection(db, 'employees'));
+      console.log("📊 Fetching employees from Firestore...");
+      const employeesSnapshot = await getDocs(collection(db, "employees"));
       const totalEmployees = employeesSnapshot.size;
-      console.log('✅ Total employees found:', totalEmployees);
+      console.log("✅ Total employees found:", totalEmployees);
 
       const employeesData = employeesSnapshot.docs.map((doc) => {
         const data = doc.data();
         console.log(
-          '👤 Employee:',
+          "👤 Employee:",
           doc.id,
           data.name,
-          'Division:',
+          "Division:",
           data.division
         );
         return {
@@ -98,13 +98,13 @@ export default function DashboardAdmin() {
 
       // Get today's date in YYYY-MM-DD format
       // Determine target date (use selectedDate from state)
-      const todayStr = selectedDate || new Date().toISOString().split('T')[0];
-      console.log('📅 Target date for stats:', todayStr);
+      const todayStr = selectedDate || new Date().toISOString().split("T")[0];
+      console.log("📅 Target date for stats:", todayStr);
 
       // Fetch attendance for today
       console.log("📊 Fetching today's attendance...");
       const attendanceSnapshot = await getDocs(
-        query(collection(db, 'attendance'), where('date', '==', todayStr))
+        query(collection(db, "attendance"), where("date", "==", todayStr))
       );
 
       // Calculate late arrivals (check-in after 11:00 AM) and unique present employees
@@ -115,67 +115,67 @@ export default function DashboardAdmin() {
         const data = doc.data();
 
         // Only count check-in records for presence
-        if (data.type === 'check-in') {
+        if (data.type === "check-in") {
           presentEmployeeIds.add(data.employeeId);
 
           // Handle different timestamp formats
-          let checkInTime = '00:00:00';
+          let checkInTime = "00:00:00";
 
           if (data.timestamp) {
             // If it's a Firestore Timestamp object
             if (
               data.timestamp.toDate &&
-              typeof data.timestamp.toDate === 'function'
+              typeof data.timestamp.toDate === "function"
             ) {
               const date = data.timestamp.toDate();
-              checkInTime = date.toTimeString().split(' ')[0]; // Get HH:MM:SS
+              checkInTime = date.toTimeString().split(" ")[0]; // Get HH:MM:SS
             }
             // If it's a timestamp with seconds property
             else if (data.timestamp.seconds) {
               const date = new Date(data.timestamp.seconds * 1000);
-              checkInTime = date.toTimeString().split(' ')[0];
+              checkInTime = date.toTimeString().split(" ")[0];
             }
             // If it's already a string
-            else if (typeof data.timestamp === 'string') {
-              checkInTime = data.timestamp.split('T')[1] || '00:00:00';
+            else if (typeof data.timestamp === "string") {
+              checkInTime = data.timestamp.split("T")[1] || "00:00:00";
             }
           }
 
-          if (checkInTime > '11:00:00') {
+          if (checkInTime > "11:00:00") {
             late++;
-            console.log('⏰ Late check-in:', data.employeeName, checkInTime);
+            console.log("⏰ Late check-in:", data.employeeName, checkInTime);
           }
         }
       });
 
       const presentToday = presentEmployeeIds.size;
-      console.log('✅ Present today (unique employees):', presentToday);
-      console.log('📊 Late arrivals:', late);
+      console.log("✅ Present today (unique employees):", presentToday);
+      console.log("📊 Late arrivals:", late);
 
       // Calculate division breakdown
       const divisionCounts: { [key: string]: number } = {};
       employeesData.forEach((emp) => {
-        const division = emp.division || 'Unknown';
+        const division = emp.division || "Unknown";
         divisionCounts[division] = (divisionCounts[division] || 0) + 1;
       });
 
-      console.log('📊 Division breakdown:', divisionCounts);
+      console.log("📊 Division breakdown:", divisionCounts);
 
       const chartData = Object.entries(divisionCounts).map(([name, value]) => ({
         name,
         value,
       }));
 
-      console.log('📊 Chart data:', chartData);
+      console.log("📊 Chart data:", chartData);
 
       // Fetch recent activities - Get from attendance records (check-in/check-out)
-      console.log('📊 Fetching recent activities from attendance...');
+      console.log("📊 Fetching recent activities from attendance...");
 
       // Get recent attendance records to show employee check-in/check-out activities
       const recentAttendance = await getDocs(
         query(
-          collection(db, 'attendance'),
-          orderBy('timestamp', 'desc'),
+          collection(db, "attendance"),
+          orderBy("timestamp", "desc"),
           limit(10)
         )
       );
@@ -186,37 +186,37 @@ export default function DashboardAdmin() {
           const data = doc.data();
 
           // Convert Firestore Timestamp to ISO string for consistent handling
-          let timestampStr = '';
+          let timestampStr = "";
           if (data.timestamp) {
             if (
               data.timestamp.toDate &&
-              typeof data.timestamp.toDate === 'function'
+              typeof data.timestamp.toDate === "function"
             ) {
               timestampStr = data.timestamp.toDate().toISOString();
             } else if (data.timestamp.seconds) {
               timestampStr = new Date(
                 data.timestamp.seconds * 1000
               ).toISOString();
-            } else if (typeof data.timestamp === 'string') {
+            } else if (typeof data.timestamp === "string") {
               timestampStr = data.timestamp;
             }
           }
 
           return {
             id: doc.id,
-            employeeName: data.employeeName || 'Unknown',
-            action: `${data.type === 'check-in' ? 'Check in' : 'Check out'}`,
+            employeeName: data.employeeName || "Unknown",
+            action: `${data.type === "check-in" ? "Check in" : "Check out"}`,
             type: data.type as
-              | 'check-in'
-              | 'check-out'
-              | 'add-employee'
-              | 'edit-employee',
+              | "check-in"
+              | "check-out"
+              | "add-employee"
+              | "edit-employee",
             timestamp: timestampStr,
             division: data.division,
           };
         }) as Activity[];
 
-      console.log('✅ Activities found:', activitiesList.length);
+      console.log("✅ Activities found:", activitiesList.length);
 
       const stats = {
         totalEmployees,
@@ -225,20 +225,20 @@ export default function DashboardAdmin() {
         absentToday: totalEmployees - presentToday,
       };
 
-      console.log('✅ Final stats:', stats);
+      console.log("✅ Final stats:", stats);
 
       setStats(stats);
       setDivisionData(chartData);
       setActivities(activitiesList);
     } catch (error) {
-      console.error('❌ Error fetching data:', error);
+      console.error("❌ Error fetching data:", error);
       // Log the full error for debugging
       if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
       }
     } finally {
-      console.log('✅ DashboardAdmin: Finished loading');
+      console.log("✅ DashboardAdmin: Finished loading");
       setLoadingStats(false);
     }
   };
@@ -277,22 +277,22 @@ export default function DashboardAdmin() {
 
   const getActivityTypeLabel = (type: string) => {
     const labels: { [key: string]: string } = {
-      'check-in': 'Check In',
-      'check-out': 'Check Out',
-      'add-employee': 'Tambah Peserta',
-      'edit-employee': 'Edit Peserta',
+      "check-in": "Check In",
+      "check-out": "Check Out",
+      "add-employee": "Tambah Peserta",
+      "edit-employee": "Edit Peserta",
     };
     return labels[type] || type;
   };
 
   const getActivityTypeColor = (type: string) => {
     const colors: { [key: string]: string } = {
-      'check-in': 'bg-green-100 text-green-800',
-      'check-out': 'bg-blue-100 text-blue-800',
-      'add-employee': 'bg-purple-100 text-purple-800',
-      'edit-employee': 'bg-orange-100 text-orange-800',
+      "check-in": "bg-green-100 text-green-800",
+      "check-out": "bg-blue-100 text-blue-800",
+      "add-employee": "bg-purple-100 text-purple-800",
+      "edit-employee": "bg-orange-100 text-orange-800",
     };
-    return colors[type] || 'bg-gray-100 text-gray-800';
+    return colors[type] || "bg-gray-100 text-gray-800";
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -303,21 +303,21 @@ export default function DashboardAdmin() {
 
       if (isToday) {
         return (
-          date.toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'Asia/Jakarta',
-          }) + ' WIB'
+          date.toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Jakarta",
+          }) + " WIB"
         );
       } else {
         return (
-          date.toLocaleDateString('id-ID', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'Asia/Jakarta',
-          }) + ' WIB'
+          date.toLocaleDateString("id-ID", {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Jakarta",
+          }) + " WIB"
         );
       }
     } catch {
@@ -349,14 +349,14 @@ export default function DashboardAdmin() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Peserta"
           value={stats.totalEmployees}
           icon={Users}
           color="hsl(var(--primary))"
           subtext="Aktif dalam sistem"
-          onClick={() => setLocation('/employees')}
+          onClick={() => setLocation("/employees")}
         />
         <StatCard
           title="Hadir Hari Ini"
@@ -436,7 +436,7 @@ export default function DashboardAdmin() {
                                 {activity.division}
                               </span>
                             )}
-                            {activity.division && ' • '}
+                            {activity.division && " • "}
                             <span>{formatTimestamp(activity.timestamp)}</span>
                           </p>
                         </div>
@@ -449,9 +449,9 @@ export default function DashboardAdmin() {
                         </span>
                       </div>
                       <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        {activity.type === 'check-in'
+                        {activity.type === "check-in"
                           ? `Sudah absen masuk`
-                          : activity.type === 'check-out'
+                          : activity.type === "check-out"
                           ? `Sudah absen pulang`
                           : activity.action}
                       </p>
@@ -506,7 +506,7 @@ export default function DashboardAdmin() {
                     className="relative"
                     style={{
                       filter:
-                        'drop-shadow(0 10px 25px rgba(0, 0, 0, 0.15)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.1))',
+                        "drop-shadow(0 10px 25px rgba(0, 0, 0, 0.15)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.1))",
                     }}
                   >
                     <ResponsiveContainer width={220} height={220}>
@@ -559,18 +559,18 @@ export default function DashboardAdmin() {
                               }
                               className="transition-all hover:opacity-90"
                               style={{
-                                filter: 'brightness(1.05)',
+                                filter: "brightness(1.05)",
                               }}
                             />
                           ))}
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '12px 16px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                            backgroundColor: "rgba(255, 255, 255, 0.98)",
+                            border: "none",
+                            borderRadius: "12px",
+                            padding: "12px 16px",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
                           }}
                           formatter={(value: any, name: string) => {
                             const total = divisionData.reduce(
@@ -658,7 +658,7 @@ export default function DashboardAdmin() {
                       Total Peserta
                     </span>
                     <span className="text-lg font-bold text-primary">
-                      {divisionData.reduce((sum, item) => sum + item.value, 0)}{' '}
+                      {divisionData.reduce((sum, item) => sum + item.value, 0)}{" "}
                       orang
                     </span>
                   </div>

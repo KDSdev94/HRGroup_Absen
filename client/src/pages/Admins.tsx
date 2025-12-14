@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, Mail, Shield } from "lucide-react";
+import { Plus, Edit2, Trash2, Mail, Shield, Eye, EyeOff } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
@@ -29,13 +29,19 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import {
+  getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword,
+  sendPasswordResetEmail,
 } from "firebase/auth";
+import { initializeApp, deleteApp } from "firebase/app";
+import { firebaseConfig } from "@/lib/firebase";
 import { formatDateTable } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -48,7 +54,10 @@ interface Admin {
   createdAt: any;
 }
 
+import { useUser } from "@/contexts/UserContext";
+
 export default function Admins() {
+  const { currentUser } = useUser();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,6 +69,8 @@ export default function Admins() {
     displayName: "",
     password: "",
   });
+  const [showAddPassword, setShowAddPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -113,6 +124,15 @@ export default function Admins() {
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (currentUser?.role !== "superadmin") {
+      toast({
+        title: "Akses Ditolak",
+        description: "Hanya Super Admin yang dapat menambahkan admin baru",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!formData.email || !formData.displayName || !formData.password) {
       toast({
         title: "Error",
@@ -123,9 +143,13 @@ export default function Admins() {
     }
 
     try {
-      // Create Firebase Auth user
+      // Initialize a secondary Firebase app to create user without logging out the current user
+      const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+      const secondaryAuth = getAuth(secondaryApp);
+
+      // Create Firebase Auth user using the secondary auth instance
       const userCredential = await createUserWithEmailAndPassword(
-        auth,
+        secondaryAuth,
         formData.email,
         formData.password
       );
@@ -133,13 +157,21 @@ export default function Admins() {
       const user = userCredential.user;
 
       // Create user profile in Firestore with admin role
-      await addDoc(collection(db, "users"), {
+      // IMPORTANT: Use setDoc with user.uid as the document ID
+      // This ensures the Dashboard can find the user role by UID
+      await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: formData.email,
         displayName: formData.displayName,
         role: "admin",
         createdAt: serverTimestamp(),
       });
+
+      // Sign out from the secondary app to be safe
+      await signOut(secondaryAuth);
+
+      // Delete the secondary app to clean up
+      await deleteApp(secondaryApp);
 
       toast({
         title: "Berhasil",
@@ -183,13 +215,58 @@ export default function Admins() {
       // Update Firestore document
       await updateDoc(doc(db, "users", selectedAdmin.id), {
         displayName: formData.displayName,
-        // Note: Cannot change email directly, would need Firebase Admin SDK
       });
 
-      toast({
-        title: "Berhasil",
-        description: "Admin berhasil diperbarui",
-      });
+      // Handle Password Update
+      if (formData.password) {
+        if (selectedAdmin.uid === currentUser?.uid && auth.currentUser) {
+          try {
+            await updatePassword(auth.currentUser, formData.password);
+            toast({
+              title: "Password Diperbarui",
+              description: "Password Anda berhasil diperbarui.",
+            });
+          } catch (error: any) {
+            console.error("Error updating password:", error);
+            if (error.code === "auth/requires-recent-login") {
+              toast({
+                title: "Gagal Memperbarui Password",
+                description:
+                  "Silakan login ulang untuk mengubah password Anda.",
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "Gagal Memperbarui Password",
+                description: error.message,
+                variant: "destructive",
+              });
+            }
+          }
+        } else {
+          // For other users, we cannot directly change password without Admin SDK
+          // We will send a password reset email instead
+          try {
+            await sendPasswordResetEmail(auth, selectedAdmin.email);
+            toast({
+              title: "Email Reset Terkirim",
+              description: `Karena alasan keamanan, password admin lain tidak dapat diubah secara langsung. Email reset password telah dikirim ke ${selectedAdmin.email}.`,
+            });
+          } catch (error: any) {
+            console.error("Error sending reset email:", error);
+            toast({
+              title: "Gagal Mengirim Email",
+              description: "Gagal mengirim email reset password.",
+              variant: "destructive",
+            });
+          }
+        }
+      } else {
+        toast({
+          title: "Berhasil",
+          description: "Data admin berhasil diperbarui",
+        });
+      }
 
       setFormData({ email: "", displayName: "", password: "" });
       setIsEditDialogOpen(false);
@@ -258,12 +335,14 @@ export default function Admins() {
 
       {/* Add Admin Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogTrigger asChild>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Tambah Admin
-          </Button>
-        </DialogTrigger>
+        {currentUser?.role === "superadmin" && (
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Tambah Admin
+            </Button>
+          </DialogTrigger>
+        )}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Buat Admin Baru</DialogTitle>
@@ -297,16 +376,31 @@ export default function Admins() {
             </div>
             <div>
               <Label htmlFor="password">Kata Sandi</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Masukkan kata sandi"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showAddPassword ? "text" : "password"}
+                  placeholder="Masukkan kata sandi"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowAddPassword(!showAddPassword)}
+                >
+                  {showAddPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-500" />
+                  )}
+                </Button>
+              </div>
             </div>
             <Button type="submit" className="w-full">
               Buat Admin
@@ -449,6 +543,38 @@ export default function Admins() {
                   }
                   required
                 />
+              </div>
+              <div>
+                <Label htmlFor="edit-password">Password Baru (Opsional)</Label>
+                <div className="relative">
+                  <Input
+                    id="edit-password"
+                    type={showEditPassword ? "text" : "password"}
+                    placeholder="Biarkan kosong jika tidak ingin mengubah"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                  >
+                    {showEditPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedAdmin.uid === currentUser?.uid
+                    ? "Masukkan password baru untuk mengubahnya."
+                    : "Untuk admin lain, mengisi ini akan mengirimkan email reset password."}
+                </p>
               </div>
               <Button type="submit" className="w-full">
                 Perbarui Admin

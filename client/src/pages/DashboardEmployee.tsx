@@ -438,7 +438,7 @@ export default function DashboardEmployee() {
         </CardHeader>
         <CardContent className="px-5 sm:px-6 pb-5 sm:pb-6">
           <div className="grid grid-cols-2 gap-4 sm:gap-6">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
+            <div className="bg-linier-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 font-medium">
                 Jam Masuk
               </p>
@@ -446,7 +446,7 @@ export default function DashboardEmployee() {
                 {formatTime(employeeStats.checkInTime)}
               </p>
             </div>
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
+            <div className="bg-linier-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 font-medium">
                 Jam Keluar
               </p>
@@ -503,7 +503,7 @@ export default function DashboardEmployee() {
               {recentAttendance.map((attendance, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
+                  className="flex items-center justify-between p-3.5 sm:p-4 rounded-xl bg-linier-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="rounded-lg p-2 bg-white dark:bg-gray-700 shadow-sm">

@@ -48,6 +48,8 @@ import {
   Trash2,
   CalendarIcon,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -58,6 +60,8 @@ import {
   limit,
   deleteDoc,
   doc,
+  where,
+  Timestamp,
 } from "firebase/firestore";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -71,12 +75,22 @@ interface AttendanceRecord {
   employeeName: string;
   employeeId: string;
   division?: string;
+  batch?: string;
   timestamp: any;
   type: string;
   date: string;
   location?: {
     latitude: number;
     longitude: number;
+    accuracy?: number | null;
+    obtained?: boolean;
+    // Address fields from Firebase
+    address?: string | null;
+    street?: string | null;
+    district?: string | null;
+    city?: string | null;
+    province?: string | null;
+    postalCode?: string | null;
   };
 }
 
@@ -119,6 +133,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [filterDivision, setFilterDivision] = useState("all");
   const [filterType, setFilterType] = useState("all"); // all, check-in, check-out
+  const [filterBatch, setFilterBatch] = useState("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(
@@ -135,6 +150,8 @@ export default function Reports() {
   );
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const { toast } = useToast();
 
   const DIVISIONS = [
@@ -149,23 +166,64 @@ export default function Reports() {
     "Marketing",
   ];
 
+  const BATCHES = ["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5"];
+
   useEffect(() => {
     fetchAttendance();
-  }, []);
+  }, [dateFrom, dateTo]);
 
   // Fetch addresses for all records
   useEffect(() => {
     const fetchAddresses = async () => {
       for (const record of attendance) {
         if (record.location && !recordAddresses[record.id]) {
-          const address = await getAddressFromCoordinates(
-            record.location.latitude,
-            record.location.longitude
-          );
-          setRecordAddresses((prev) => ({
-            ...prev,
-            [record.id]: address,
-          }));
+          // PRIORITAS 1: Gunakan alamat yang sudah tersimpan di Firebase
+          if (record.location.address) {
+            setRecordAddresses((prev) => ({
+              ...prev,
+              [record.id]: record.location!.address!,
+            }));
+            console.log(
+              `✅ Using stored address for ${record.id}:`,
+              record.location.address
+            );
+          }
+          // PRIORITAS 2: Jika tidak ada alamat, coba build dari komponen
+          else if (
+            record.location.city ||
+            record.location.street ||
+            record.location.district
+          ) {
+            const parts = [
+              record.location.street,
+              record.location.district,
+              record.location.city,
+              record.location.province,
+            ].filter(Boolean);
+            const builtAddress = parts.join(", ");
+            setRecordAddresses((prev) => ({
+              ...prev,
+              [record.id]: builtAddress,
+            }));
+            console.log(
+              `✅ Built address from components for ${record.id}:`,
+              builtAddress
+            );
+          }
+          // PRIORITAS 3: Fallback ke reverse geocoding (untuk data lama)
+          else {
+            console.log(
+              `⚠️ No stored address, fetching via reverse geocoding for ${record.id}`
+            );
+            const address = await getAddressFromCoordinates(
+              record.location.latitude,
+              record.location.longitude
+            );
+            setRecordAddresses((prev) => ({
+              ...prev,
+              [record.id]: address,
+            }));
+          }
         }
       }
     };
@@ -176,26 +234,75 @@ export default function Reports() {
   }, [attendance]);
 
   const fetchAttendance = async () => {
+    setLoading(true);
     try {
-      const q = query(
-        collection(db, "attendance"),
-        orderBy("timestamp", "desc"),
-        limit(100)
-      );
+      const constraints: any[] = [];
+
+      // Where clauses must come first
+      if (dateFrom) {
+        const start = new Date(dateFrom);
+        start.setHours(0, 0, 0, 0);
+        constraints.push(where("timestamp", ">=", Timestamp.fromDate(start)));
+      }
+
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
+      }
+
+      // OrderBy comes after where clauses
+      constraints.push(orderBy("timestamp", "desc"));
+
+      // Limit comes last
+      if (!dateFrom && !dateTo) {
+        constraints.push(limit(2000));
+      }
+
+      const q = query(collection(db, "attendance"), ...constraints);
+
       const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map((doc) => ({
+      const attendanceData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as AttendanceRecord[];
-      setAttendance(data);
+
+      // Fetch employee data to get batch information
+      const employeesSnapshot = await getDocs(collection(db, "employees"));
+      const employeesMap = new Map();
+      employeesSnapshot.docs.forEach((doc) => {
+        const empData = doc.data();
+        employeesMap.set(doc.id, empData);
+        // Also map by employeeId if it exists
+        if (empData.employeeId) {
+          employeesMap.set(empData.employeeId, empData);
+        }
+      });
+
+      // Enrich attendance data with batch information
+      const enrichedData = attendanceData.map((record) => {
+        const employeeData = employeesMap.get(record.employeeId);
+        return {
+          ...record,
+          batch: employeeData?.batch || record.batch,
+        };
+      });
+
+      setAttendance(enrichedData);
+      setCurrentPage(1); // Reset to first page on new fetch
     } catch (error) {
       console.error("Error fetching attendance:", error);
+      toast({
+        variant: "destructive",
+        title: "Gagal Memuat Data",
+        description: "Terjadi kesalahan saat mengambil data kehadiran.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter attendance by division, type, and date range
+  // Filter attendance by division, type, and batch (Date filtering is now server-side)
   const filteredAttendance = attendance.filter((record) => {
     // Filter by division
     if (filterDivision !== "all" && record.division !== filterDivision) {
@@ -207,26 +314,20 @@ export default function Reports() {
       return false;
     }
 
-    // Filter by date range
-    if (dateFrom || dateTo) {
-      const recordDate = new Date(record.date);
-      recordDate.setHours(0, 0, 0, 0); // Reset time to compare dates only
-
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        if (recordDate < fromDate) return false;
-      }
-
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(0, 0, 0, 0);
-        if (recordDate > toDate) return false;
-      }
+    // Filter by batch
+    if (filterBatch !== "all" && record.batch !== filterBatch) {
+      return false;
     }
 
     return true;
   });
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredAttendance.length / itemsPerPage);
+  const paginatedAttendance = filteredAttendance.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Reverse geocoding to get address from coordinates
   const getAddressFromCoordinates = async (
@@ -468,12 +569,85 @@ export default function Reports() {
     }
   };
 
+  // Generate dynamic filename based on filters
+  const generateFilename = (extension: string) => {
+    const parts = ["Laporan_Kehadiran"];
+
+    // Add type filter
+    if (filterType !== "all") {
+      parts.push(filterType === "check-in" ? "Masuk" : "Pulang");
+    }
+
+    // Add division filter
+    if (filterDivision !== "all") {
+      parts.push(filterDivision.replace(/\s+/g, "_").replace(/&/g, "dan"));
+    }
+
+    // Add batch filter
+    if (filterBatch !== "all") {
+      parts.push(filterBatch.replace(/\s+/g, "_"));
+    }
+
+    // Add date range
+    if (dateFrom && dateTo) {
+      const from = format(dateFrom, "dd-MM-yyyy");
+      const to = format(dateTo, "dd-MM-yyyy");
+      parts.push(`${from}_sampai_${to}`);
+    } else if (dateFrom) {
+      parts.push(`dari_${format(dateFrom, "dd-MM-yyyy")}`);
+    } else if (dateTo) {
+      parts.push(`sampai_${format(dateTo, "dd-MM-yyyy")}`);
+    }
+
+    return `${parts.join("_")}.${extension}`;
+  };
+
+  // Generate dynamic title based on filters
+  const generateReportTitle = () => {
+    const parts = ["Laporan Kehadiran"];
+
+    if (filterType !== "all") {
+      parts.push(filterType === "check-in" ? "Absen Masuk" : "Absen Pulang");
+    }
+
+    if (filterDivision !== "all") {
+      parts.push(`Divisi ${filterDivision}`);
+    }
+
+    if (filterBatch !== "all") {
+      parts.push(filterBatch);
+    }
+
+    if (dateFrom && dateTo) {
+      parts.push(
+        `(${format(dateFrom, "dd MMM yyyy", { locale: localeId })} - ${format(
+          dateTo,
+          "dd MMM yyyy",
+          { locale: localeId }
+        )})`
+      );
+    } else if (dateFrom) {
+      parts.push(
+        `(dari ${format(dateFrom, "dd MMM yyyy", { locale: localeId })})`
+      );
+    } else if (dateTo) {
+      parts.push(
+        `(sampai ${format(dateTo, "dd MMM yyyy", { locale: localeId })})`
+      );
+    }
+
+    return parts.join(" ");
+  };
+
   const exportToExcel = () => {
+    const title = generateReportTitle();
+
     const ws = XLSX.utils.json_to_sheet(
       filteredAttendance.map((row) => ({
         Nama: row.employeeName,
         "ID Peserta": row.employeeId,
         Divisi: row.division || "-",
+        Batch: row.batch || "-",
         Tanggal: formatDateIndonesian(row.date),
         Waktu: row.timestamp
           ? new Date(row.timestamp.seconds * 1000).toLocaleTimeString("id-ID", {
@@ -491,18 +665,79 @@ export default function Reports() {
           : "-",
       }))
     );
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Kehadiran");
-    XLSX.writeFile(wb, "laporan-kehadiran.xlsx");
+    XLSX.writeFile(wb, generateFilename("xlsx"));
+
+    toast({
+      title: "✅ Excel Berhasil Diunduh",
+      description: title,
+    });
   };
 
   const exportToPDF = () => {
+    const title = generateReportTitle();
     const doc = new jsPDF();
-    doc.text("Laporan Kehadiran Peserta", 14, 15);
+
+    // Add title
+    doc.setFontSize(16);
+    doc.text(title, 14, 15);
+
+    // Add filter info
+    doc.setFontSize(10);
+    let yPos = 25;
+    if (
+      dateFrom ||
+      dateTo ||
+      filterDivision !== "all" ||
+      filterType !== "all" ||
+      filterBatch !== "all"
+    ) {
+      doc.text("Filter:", 14, yPos);
+      yPos += 5;
+
+      if (filterDivision !== "all") {
+        doc.text(`• Divisi: ${filterDivision}`, 14, yPos);
+        yPos += 5;
+      }
+      if (filterBatch !== "all") {
+        doc.text(`• Batch: ${filterBatch}`, 14, yPos);
+        yPos += 5;
+      }
+      if (filterType !== "all") {
+        doc.text(
+          `• Tipe: ${
+            filterType === "check-in" ? "Absen Masuk" : "Absen Pulang"
+          }`,
+          14,
+          yPos
+        );
+        yPos += 5;
+      }
+      if (dateFrom) {
+        doc.text(
+          `• Dari: ${format(dateFrom, "dd MMMM yyyy", { locale: localeId })}`,
+          14,
+          yPos
+        );
+        yPos += 5;
+      }
+      if (dateTo) {
+        doc.text(
+          `• Sampai: ${format(dateTo, "dd MMMM yyyy", { locale: localeId })}`,
+          14,
+          yPos
+        );
+        yPos += 5;
+      }
+      yPos += 3;
+    }
 
     const tableData = filteredAttendance.map((row) => [
       row.employeeName,
       row.division || "-",
+      row.batch || "-",
       formatDateIndonesian(row.date),
       row.timestamp
         ? new Date(row.timestamp.seconds * 1000).toLocaleTimeString("id-ID", {
@@ -518,12 +753,19 @@ export default function Reports() {
     ]);
 
     autoTable(doc, {
-      head: [["Nama", "Divisi", "Tanggal", "Waktu", "Tipe", "Lokasi"]],
+      head: [["Nama", "Divisi", "Batch", "Tanggal", "Waktu", "Tipe", "Lokasi"]],
       body: tableData,
-      startY: 20,
+      startY: yPos,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [59, 130, 246] },
     });
 
-    doc.save("laporan-kehadiran.pdf");
+    doc.save(generateFilename("pdf"));
+
+    toast({
+      title: "✅ PDF Berhasil Diunduh",
+      description: title,
+    });
   };
 
   return (
@@ -563,7 +805,7 @@ export default function Reports() {
           <CardTitle>Filter Laporan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Division Filter */}
             <div className="flex-1">
               <Label>Filter Divisi</Label>
@@ -593,6 +835,24 @@ export default function Reports() {
                   <SelectItem value="all">Semua Tipe</SelectItem>
                   <SelectItem value="check-in">Absen Masuk</SelectItem>
                   <SelectItem value="check-out">Absen Pulang</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Batch Filter */}
+            <div className="flex-1">
+              <Label>Filter Batch</Label>
+              <Select value={filterBatch} onValueChange={setFilterBatch}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Semua Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Batch</SelectItem>
+                  {BATCHES.map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -689,7 +949,8 @@ export default function Reports() {
           {(dateFrom ||
             dateTo ||
             filterDivision !== "all" ||
-            filterType !== "all") && (
+            filterType !== "all" ||
+            filterBatch !== "all") && (
             <div className="mt-4 pt-4 border-t">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center flex-wrap gap-2">
@@ -704,6 +965,11 @@ export default function Reports() {
                       {filterType === "check-in"
                         ? "Absen Masuk"
                         : "Absen Pulang"}
+                    </span>
+                  )}
+                  {filterBatch !== "all" && (
+                    <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 rounded text-xs">
+                      {filterBatch}
                     </span>
                   )}
                   {dateFrom && (
@@ -723,6 +989,7 @@ export default function Reports() {
                   onClick={() => {
                     setFilterDivision("all");
                     setFilterType("all");
+                    setFilterBatch("all");
                     setDateFrom(undefined);
                     setDateTo(undefined);
                   }}
@@ -800,9 +1067,13 @@ export default function Reports() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAttendance.map((record, index) => {
+                paginatedAttendance.map((record, index) => {
                   const locStatus = getLocationStatus(record);
                   const isSelected = selectedRecords.has(record.id);
+                  // Calculate absolute index for numbering
+                  const absoluteIndex =
+                    (currentPage - 1) * itemsPerPage + index + 1;
+
                   return (
                     <TableRow
                       key={record.id}
@@ -819,7 +1090,7 @@ export default function Reports() {
                         />
                       </TableCell>
                       <TableCell className="text-gray-500 text-sm">
-                        {index + 1}
+                        {absoluteIndex}
                       </TableCell>
                       <TableCell className="font-medium">
                         {record.employeeName}
@@ -882,6 +1153,47 @@ export default function Reports() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {!loading && filteredAttendance.length > 0 && (
+            <div className="flex items-center justify-between px-2 py-4 border-t mt-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Menampilkan {(currentPage - 1) * itemsPerPage + 1} sampai{" "}
+                {Math.min(
+                  currentPage * itemsPerPage,
+                  filteredAttendance.length
+                )}{" "}
+                dari {filteredAttendance.length} data
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center justify-center px-2 text-sm font-medium">
+                  Halaman {currentPage} dari {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

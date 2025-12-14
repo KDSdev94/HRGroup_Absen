@@ -163,7 +163,7 @@ export default function TodayAttendance() {
           onClick={() => setLocation("/")}
           className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Kembali
+          <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">

@@ -25,6 +25,7 @@ import {
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { onAuthStateChanged } from "firebase/auth";
+import { getCompleteLocation, formatLocationDisplay } from "@/utils/gpsUtils";
 
 export default function Scan() {
   const [scanResult, setScanResult] = useState<any | null>(null);
@@ -620,62 +621,28 @@ export default function Scan() {
         successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
       } else {
         // Already checked out
-        throw new Error("Semoga Harimu Menyenangkan 🤗");
+        throw new Error("Error: You have already checked outs");
       }
 
-      // Get Location - Try to get location but don't block attendance
-      let latitude = -6.2; // Default Jakarta coordinates
-      let longitude = 106.816666;
-      let locationObtained = false;
+      // Get Location - HIGH ACCURACY MODE with Reverse Geocoding
+      console.log("📍 Getting high accuracy location with address...");
 
-      if (navigator.geolocation) {
-        try {
-          console.log("📍 Attempting to get location (non-blocking)...");
+      const locationData = await getCompleteLocation(false); // false = use OpenStreetMap (free)
 
-          // Try low accuracy first (faster and more reliable)
-          const locationPromise = new Promise<GeolocationPosition>(
-            (resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  resolve(position);
-                },
-                (error) => {
-                  reject(error);
-                },
-                {
-                  enableHighAccuracy: false, // Use network/wifi location (faster)
-                  timeout: 8000, // 8 second timeout
-                  maximumAge: 60000, // Accept cached position up to 60 seconds old
-                }
-              );
-            }
-          );
+      const {
+        latitude,
+        longitude,
+        accuracy,
+        obtained: locationObtained,
+        address,
+        street,
+        district,
+        city,
+        province,
+        postalCode,
+      } = locationData;
 
-          // Race between location and timeout - but don't fail if location times out
-          const timeoutPromise = new Promise<null>((resolve) =>
-            setTimeout(() => resolve(null), 8000)
-          );
-
-          const result = await Promise.race([locationPromise, timeoutPromise]);
-
-          if (result) {
-            latitude = result.coords.latitude;
-            longitude = result.coords.longitude;
-            locationObtained = true;
-            console.log("✅ Location obtained:", { latitude, longitude });
-          } else {
-            console.warn("⚠️ Location timeout, using default location");
-          }
-        } catch (locationError: any) {
-          console.warn(
-            "⚠️ Location error (using default):",
-            locationError.message || locationError.code
-          );
-          // Keep default location - don't fail attendance
-        }
-      } else {
-        console.warn("⚠️ Geolocation not supported, using default location");
-      }
+      console.log("✅ Complete location data:", locationData);
 
       // Update scan result to include attendance type
       setScanResult({
@@ -683,7 +650,7 @@ export default function Scan() {
         type: attendanceType,
       });
 
-      // Log attendance to Firebase with Location
+      // Log attendance to Firebase with Enhanced Location Data
       const attendanceData: any = {
         employeeId: data.id,
         employeeName: data.name,
@@ -694,8 +661,15 @@ export default function Scan() {
         location: {
           latitude,
           longitude,
-          accuracy: locationObtained ? "high/low" : "default",
+          accuracy: accuracy, // Accuracy in meters (number) or null
           obtained: locationObtained,
+          // NEW: Address information from reverse geocoding
+          address: address || null,
+          street: street || null,
+          district: district || null,
+          city: city || null,
+          province: province || null,
+          postalCode: postalCode || null,
         },
       };
 
@@ -727,10 +701,29 @@ export default function Scan() {
         hour12: false,
       });
 
-      // Show detailed success toast
-      const locationStatus = locationObtained
-        ? "📍 Lokasi: Terdeteksi"
-        : "📍 Lokasi: Default (GPS tidak tersedia)";
+      // Show detailed success toast with address
+      let locationStatus = "";
+      if (locationObtained) {
+        if (address) {
+          // Show address if available
+          const shortAddress =
+            city || district || street || "Lokasi terdeteksi";
+          locationStatus = `📍 ${shortAddress}`;
+          if (accuracy) {
+            locationStatus += ` (±${Math.round(accuracy)}m)`;
+          }
+        } else {
+          // Show coordinates if no address
+          locationStatus = `📍 Lat: ${latitude.toFixed(
+            4
+          )}, Lon: ${longitude.toFixed(4)}`;
+          if (accuracy) {
+            locationStatus += ` (±${Math.round(accuracy)}m)`;
+          }
+        }
+      } else {
+        locationStatus = "📍 Lokasi: Default (GPS tidak tersedia)";
+      }
 
       toast({
         title:
