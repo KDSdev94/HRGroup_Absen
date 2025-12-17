@@ -9,6 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Clock, AlertCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -22,11 +29,14 @@ interface LateRecord {
   date: string;
   timestamp: any;
   type: "check-in";
+  batch?: string;
 }
 
 export default function LateAttendance() {
   const [, setLocation] = useLocation();
   const [lateRecords, setLateRecords] = useState<LateRecord[]>([]);
+  const [filterBatch, setFilterBatch] = useState("all");
+  const BATCHES = ["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5"];
   const [loading, setLoading] = useState(true);
 
   // Get date from URL query parameter or default to today
@@ -54,6 +64,17 @@ export default function LateAttendance() {
           where("type", "==", "check-in")
         )
       );
+
+      // Fetch employees to get batch info
+      const employeesSnapshot = await getDocs(collection(db, "employees"));
+      const employeeBatches = new Map<string, string>();
+      employeesSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.batch) {
+          employeeBatches.set(doc.id, data.batch);
+          if (data.employeeId) employeeBatches.set(data.employeeId, data.batch);
+        }
+      });
 
       const lateList: LateRecord[] = [];
 
@@ -83,6 +104,7 @@ export default function LateAttendance() {
           lateList.push({
             ...data,
             id: doc.id,
+            batch: employeeBatches.get(data.employeeId) || "-",
           });
         }
       });
@@ -196,7 +218,20 @@ export default function LateAttendance() {
               Daftar peserta yang check-in setelah pukul 11:00 WIB
             </p>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 dark:text-gray-400">
+              <Select value={filterBatch} onValueChange={setFilterBatch}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Semua Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Batch</SelectItem>
+                  {BATCHES.map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <label className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                 Filter Tanggal:
               </label>
               <input
@@ -214,7 +249,14 @@ export default function LateAttendance() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-600" />
-            Daftar Keterlambatan ({lateRecords.length})
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+            Daftar Keterlambatan (
+            {
+              lateRecords.filter(
+                (r) => filterBatch === "all" || r.batch === filterBatch
+              ).length
+            }
+            )
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -245,28 +287,33 @@ export default function LateAttendance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lateRecords.map((record, index) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        {record.employeeName}
-                      </TableCell>
-                      <TableCell>{record.division || "-"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-amber-600" />
-                          <span className="text-amber-700 dark:text-amber-500 font-medium">
-                            {formatTime(record.timestamp)}
+                  {lateRecords
+                    .filter(
+                      (record) =>
+                        filterBatch === "all" || record.batch === filterBatch
+                    )
+                    .map((record, index) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">
+                          {record.employeeName}
+                        </TableCell>
+                        <TableCell>{record.division || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-amber-600" />
+                            <span className="text-amber-700 dark:text-amber-500 font-medium">
+                              {formatTime(record.timestamp)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                            {calculateLateDuration(record.timestamp)}
                           </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                          {calculateLateDuration(record.timestamp)}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </div>

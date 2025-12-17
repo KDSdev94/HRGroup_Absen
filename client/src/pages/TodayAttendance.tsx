@@ -10,6 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Clock, CheckCircle2, LogOut } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -23,11 +30,14 @@ interface AttendanceRecord {
   date: string;
   timestamp: any;
   type: "check-in" | "check-out";
+  batch?: string;
 }
 
 export default function TodayAttendance() {
   const [, setLocation] = useLocation();
   const [checkInRecords, setCheckInRecords] = useState<AttendanceRecord[]>([]);
+  const [filterBatch, setFilterBatch] = useState("all");
+  const BATCHES = ["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5"];
   const [checkOutRecords, setCheckOutRecords] = useState<AttendanceRecord[]>(
     []
   );
@@ -55,14 +65,28 @@ export default function TodayAttendance() {
         query(collection(db, "attendance"), where("date", "==", targetDate))
       );
 
+      // Fetch employees to get batch info
+      const employeesSnapshot = await getDocs(collection(db, "employees"));
+      const employeeBatches = new Map<string, string>();
+      employeesSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        // Map both firestore ID and custom employeeId to batch
+        if (data.batch) {
+          employeeBatches.set(doc.id, data.batch);
+          if (data.employeeId) employeeBatches.set(data.employeeId, data.batch);
+        }
+      });
+
       const checkIns: AttendanceRecord[] = [];
       const checkOuts: AttendanceRecord[] = [];
 
       attendanceSnapshot.docs.forEach((doc) => {
         const data = doc.data() as AttendanceRecord;
+        const batch = employeeBatches.get(data.employeeId) || "-";
         const record = {
           ...data,
           id: doc.id,
+          batch,
         };
 
         if (data.type === "check-in") {
@@ -174,7 +198,20 @@ export default function TodayAttendance() {
               Detail kehadiran peserta pada tanggal yang dipilih
             </p>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 dark:text-gray-400">
+              <Select value={filterBatch} onValueChange={setFilterBatch}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Semua Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Batch</SelectItem>
+                  {BATCHES.map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <label className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                 Filter Tanggal:
               </label>
               <input
@@ -192,11 +229,23 @@ export default function TodayAttendance() {
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="check-in" className="gap-2">
             <CheckCircle2 className="h-4 w-4" />
-            Absen Masuk ({checkInRecords.length})
+            Absen Masuk (
+            {
+              checkInRecords.filter(
+                (r) => filterBatch === "all" || r.batch === filterBatch
+              ).length
+            }
+            )
           </TabsTrigger>
           <TabsTrigger value="check-out" className="gap-2">
             <LogOut className="h-4 w-4" />
-            Absen Pulang ({checkOutRecords.length})
+            Absen Pulang (
+            {
+              checkOutRecords.filter(
+                (r) => filterBatch === "all" || r.batch === filterBatch
+              ).length
+            }
+            )
           </TabsTrigger>
         </TabsList>
 
@@ -232,32 +281,38 @@ export default function TodayAttendance() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {checkInRecords.map((record, index) => (
-                        <TableRow key={record.id}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">
-                            {record.employeeName}
-                          </TableCell>
-                          <TableCell>{record.division || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-gray-400" />
-                              {formatTime(record.timestamp)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {isLate(record.timestamp) ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                                Terlambat
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                                Tepat Waktu
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {checkInRecords
+                        .filter(
+                          (record) =>
+                            filterBatch === "all" ||
+                            record.batch === filterBatch
+                        )
+                        .map((record, index) => (
+                          <TableRow key={record.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">
+                              {record.employeeName}
+                            </TableCell>
+                            <TableCell>{record.division || "-"}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-gray-400" />
+                                {formatTime(record.timestamp)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {isLate(record.timestamp) ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                  Terlambat
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                  Tepat Waktu
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -297,21 +352,27 @@ export default function TodayAttendance() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {checkOutRecords.map((record, index) => (
-                        <TableRow key={record.id}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">
-                            {record.employeeName}
-                          </TableCell>
-                          <TableCell>{record.division || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-gray-400" />
-                              {formatTime(record.timestamp)}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {checkOutRecords
+                        .filter(
+                          (record) =>
+                            filterBatch === "all" ||
+                            record.batch === filterBatch
+                        )
+                        .map((record, index) => (
+                          <TableRow key={record.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">
+                              {record.employeeName}
+                            </TableCell>
+                            <TableCell>{record.division || "-"}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-gray-400" />
+                                {formatTime(record.timestamp)}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </div>

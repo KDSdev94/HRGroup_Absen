@@ -10,6 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, XCircle, UserX, LogOut } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -20,6 +27,7 @@ interface Employee {
   name: string;
   division?: string;
   employeeId?: string;
+  batch?: string;
 }
 
 interface AttendanceRecord {
@@ -30,6 +38,8 @@ interface AttendanceRecord {
 export default function AbsentToday() {
   const [, setLocation] = useLocation();
   const [notCheckedIn, setNotCheckedIn] = useState<Employee[]>([]);
+  const [filterBatch, setFilterBatch] = useState("all");
+  const BATCHES = ["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5"];
   const [notCheckedOut, setNotCheckedOut] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +67,7 @@ export default function AbsentToday() {
         name: doc.data().name,
         division: doc.data().division,
         employeeId: doc.data().employeeId || doc.id,
+        batch: doc.data().batch,
       }));
 
       // Fetch all attendance for the selected date
@@ -128,7 +139,20 @@ export default function AbsentToday() {
               Daftar peserta yang belum melakukan absensi
             </p>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 dark:text-gray-400">
+              <Select value={filterBatch} onValueChange={setFilterBatch}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Semua Batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Batch</SelectItem>
+                  {BATCHES.map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <label className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                 Filter Tanggal:
               </label>
               <input
@@ -146,11 +170,23 @@ export default function AbsentToday() {
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="not-checked-in" className="gap-2">
             <UserX className="h-4 w-4" />
-            Belum Absen Masuk ({notCheckedIn.length})
+            Belum Absen Masuk (
+            {
+              notCheckedIn.filter(
+                (e) => filterBatch === "all" || e.batch === filterBatch
+              ).length
+            }
+            )
           </TabsTrigger>
           <TabsTrigger value="not-checked-out" className="gap-2">
             <LogOut className="h-4 w-4" />
-            Belum Absen Pulang ({notCheckedOut.length})
+            Belum Absen Pulang (
+            {
+              notCheckedOut.filter(
+                (e) => filterBatch === "all" || e.batch === filterBatch
+              ).length
+            }
+            )
           </TabsTrigger>
         </TabsList>
 
@@ -190,23 +226,29 @@ export default function AbsentToday() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {notCheckedIn.map((employee, index) => (
-                        <TableRow key={employee.id}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">
-                            {employee.name}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {employee.employeeId || employee.id}
-                          </TableCell>
-                          <TableCell>{employee.division || "-"}</TableCell>
-                          <TableCell>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                              Belum Hadir
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {notCheckedIn
+                        .filter(
+                          (employee) =>
+                            filterBatch === "all" ||
+                            employee.batch === filterBatch
+                        )
+                        .map((employee, index) => (
+                          <TableRow key={employee.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">
+                              {employee.name}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {employee.employeeId || employee.id}
+                            </TableCell>
+                            <TableCell>{employee.division || "-"}</TableCell>
+                            <TableCell>
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                Belum Hadir
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -251,23 +293,29 @@ export default function AbsentToday() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {notCheckedOut.map((employee, index) => (
-                        <TableRow key={employee.id}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">
-                            {employee.name}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {employee.employeeId || employee.id}
-                          </TableCell>
-                          <TableCell>{employee.division || "-"}</TableCell>
-                          <TableCell>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                              Masih di Tempat
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {notCheckedOut
+                        .filter(
+                          (employee) =>
+                            filterBatch === "all" ||
+                            employee.batch === filterBatch
+                        )
+                        .map((employee, index) => (
+                          <TableRow key={employee.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">
+                              {employee.name}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {employee.employeeId || employee.id}
+                            </TableCell>
+                            <TableCell>{employee.division || "-"}</TableCell>
+                            <TableCell>
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                Masih di Tempat
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
