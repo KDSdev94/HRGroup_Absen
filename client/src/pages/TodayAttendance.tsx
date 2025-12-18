@@ -31,6 +31,7 @@ interface AttendanceRecord {
   timestamp: any;
   type: "check-in" | "check-out";
   batch?: string;
+  status?: string;
 }
 
 export default function TodayAttendance() {
@@ -157,8 +158,12 @@ export default function TodayAttendance() {
     }
   };
 
-  const isLate = (timestamp: any) => {
+  const isLate = (record: AttendanceRecord) => {
+    if (record.status === "late") return true;
+    if (record.status === "on-time") return false;
+
     try {
+      const timestamp = record.timestamp;
       let date: Date;
 
       if (timestamp?.toDate && typeof timestamp.toDate === "function") {
@@ -180,26 +185,32 @@ export default function TodayAttendance() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setLocation("/")}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/")}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white md:hidden">
             Absensi Hari Ini
           </h1>
-          <div className="flex items-center justify-between gap-4 mt-2">
-            <p className="text-gray-500">
+        </div>
+
+        <div className="flex-1 w-full">
+          <h1 className="hidden md:block text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Absensi Hari Ini
+          </h1>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+            <p className="text-gray-500 text-sm md:text-base">
               Detail kehadiran peserta pada tanggal yang dipilih
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
               <Select value={filterBatch} onValueChange={setFilterBatch}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Semua Batch" />
                 </SelectTrigger>
                 <SelectContent>
@@ -211,15 +222,17 @@ export default function TodayAttendance() {
                   ))}
                 </SelectContent>
               </Select>
-              <label className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                Filter Tanggal:
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-2 py-1 rounded border bg-white dark:bg-gray-800 text-sm"
-              />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Filter Tanggal:
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="flex-1 sm:flex-none px-2 py-1 rounded border bg-white dark:bg-gray-800 text-sm w-full sm:w-auto"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -301,7 +314,7 @@ export default function TodayAttendance() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              {isLate(record.timestamp) ? (
+                              {isLate(record) ? (
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                                   Terlambat
                                 </span>

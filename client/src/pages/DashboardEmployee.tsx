@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
@@ -403,13 +413,112 @@ export default function DashboardEmployee() {
 
   return (
     <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-1 sm:space-y-2">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Halo, {employeeStats.name}! 👋
-        </h1>
-        <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
-          Selamat datang di dashboard kehadiran Anda - {employeeStats.division}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1 sm:space-y-2">
+          <h1
+            className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight transition-transform hover:scale-[1.02]
+               animate-in fade-in slide-in-from-left-3 duration-400 "
+          >
+            Halo,{" "}
+            <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
+              {employeeStats.name}
+            </span>
+            !{" "}
+            <span className="inline-block animate-wave origin-[70%_70%]">
+              👋
+            </span>
+          </h1>
+
+          <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
+            Welkam di dashboard absensimu –{" "}
+            <span className="inline-block rounded-full bg-indigo-50 dark:bg-indigo-500/10 px-3 py-0.5 text-indigo-600 dark:text-indigo-400 font-medium">
+              {employeeStats.division}
+            </span>
+          </p>
+        </div>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="icon" className="shrink-0">
+              <Info className="h-5 w-5 text-blue-600" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Ketentuan Absensi</DialogTitle>
+              <DialogDescription>
+                Informasi jadwal dan aturan penggunaan aplikasi absensi.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 text-sm">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+                <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                  Jadwal Absen Masuk
+                </h3>
+                <ul className="space-y-1 text-gray-700 dark:text-gray-300">
+                  <li className="flex justify-between">
+                    <span>Senin:</span>
+                    <span className="font-medium">08:30 - 10:00 WIB</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>Selasa - Sabtu:</span>
+                    <span className="font-medium">07:30 - 09:00 WIB</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg border border-orange-100 dark:border-orange-800">
+                <h3 className="font-semibold text-orange-800 dark:text-orange-300 mb-2">
+                  Jadwal Absen Pulang
+                </h3>
+                <ul className="space-y-1 text-gray-700 dark:text-gray-300">
+                  <li className="flex justify-between">
+                    <span>Senin - Jumat:</span>
+                    <span className="font-medium">15:30 - 16:30 WIB</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>Sabtu:</span>
+                    <span className="font-medium">11:30 - 12:30 WIB</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Ketentuan Keterlambatan
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Jika Anda melakukan scan masuk{" "}
+                  <strong>
+                    melewati batas waktu <em className="italic">check-in</em>
+                  </strong>{" "}
+                  (misal: lewat jam 10:00 WIB), sistem akan tetap mencatat
+                  kehadiranmu namun statusnya akan ditandai sebagai{" "}
+                  <strong>"Terlambat"</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Syarat Melakukan Scan
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                  <li>Wajib izinkan akses lokasi pada browser.</li>
+                  <li>Wajib izinkan akses kamera pada browser.</li>
+                  <li>QR Code harus sesuai dengan akun Anda.</li>
+                  <li>Pastikan koneksi internet stabil.</li>
+                </ul>
+              </div>
+
+              <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 italic">
+                Mohon maaf jika nama lokasi kurang akurat karena tidak
+                menggunakan data dari Google Maps (Developer tidak memiliki dana
+                untuk membeli API-nya) 😁.
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Status Today */}

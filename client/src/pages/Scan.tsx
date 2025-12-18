@@ -595,13 +595,25 @@ export default function Scan() {
             `Absen masuk belum dibuka. Dimulai pukul ${checkInStartTime} WIB.`
           );
         }
-        if (currentTime > CHECK_IN_END) {
+
+        // Allow check-in until check-out starts, but mark as late if after CHECK_IN_END
+        const checkOutStartVal = day === 6 ? 11.5 : 15.5; // 11:30 Sat, 15:30 others
+
+        if (currentTime > checkOutStartVal) {
           throw new Error(
-            `Absen masuk sudah ditutup. Berakhir pukul ${checkInEndTime} WIB.`
+            `Waktu absen masuk sudah habis. Sekarang waktunya absen pulang.`
           );
         }
+
         attendanceType = "check-in";
-        successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
+
+        if (currentTime > CHECK_IN_END) {
+          // Late check-in
+          successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil (Terlambat).`;
+        } else {
+          // On-time check-in
+          successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
+        }
       } else if (checkOutSnapshot.empty) {
         // Check-in exists, no check-out yet - must be check-out time
         const checkOutStartTime = day === 6 ? "11:30" : "15:30";
@@ -650,6 +662,12 @@ export default function Scan() {
         type: attendanceType,
       });
 
+      // Determine status
+      let status = "on-time";
+      if (attendanceType === "check-in" && currentTime > CHECK_IN_END) {
+        status = "late";
+      }
+
       // Log attendance to Firebase with Enhanced Location Data
       const attendanceData: any = {
         employeeId: data.id,
@@ -658,6 +676,7 @@ export default function Scan() {
         timestamp: serverTimestamp(), // Server timestamp is safer
         date: dateString,
         type: attendanceType,
+        status: status, // Add status field
         location: {
           latitude,
           longitude,

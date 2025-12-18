@@ -141,7 +141,15 @@ export default function DashboardAdmin() {
             }
           }
 
-          if (checkInTime > "11:00:00") {
+          // Check if late using status or legacy time check
+          let isLate = false;
+          if (data.status === "late") {
+            isLate = true;
+          } else if (checkInTime > "11:00:00") {
+            isLate = true;
+          }
+
+          if (isLate) {
             late++;
             console.log("⏰ Late check-in:", data.employeeName, checkInTime);
           }
@@ -331,19 +339,19 @@ export default function DashboardAdmin() {
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
           Dashboard Admin
         </h1>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
             Overview statistik kehadiran dan aktivitas terbaru.
           </p>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
               Filter Tanggal:
             </label>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-2 py-1 rounded border bg-white dark:bg-gray-800 text-sm"
+              className="flex-1 md:flex-none px-2 py-1 rounded border bg-white dark:bg-gray-800 text-sm"
             />
           </div>
         </div>
