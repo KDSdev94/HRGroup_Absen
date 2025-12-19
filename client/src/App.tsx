@@ -20,6 +20,9 @@ import Profile from "@/pages/Profile";
 import TodayAttendance from "@/pages/TodayAttendance";
 import LateAttendance from "@/pages/LateAttendance";
 import AbsentToday from "@/pages/AbsentToday";
+import DataCleanup from "@/pages/DataCleanup";
+import PermissionRequest from "@/pages/PermissionRequest";
+import AdminPermissions from "@/pages/AdminPermissions";
 import Layout from "@/components/Layout";
 import { UserProvider } from "./contexts/UserContext";
 
@@ -57,6 +60,11 @@ function Router() {
             <AbsentToday />
           </ProtectedRoute>
         </Route>
+        <Route path="/admin/permissions">
+          <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
+            <AdminPermissions />
+          </ProtectedRoute>
+        </Route>
 
         {/* Superadmin-only routes */}
         <Route path="/admins">
@@ -67,6 +75,11 @@ function Router() {
         <Route path="/employee-users">
           <ProtectedRoute allowedRoles={["superadmin"]}>
             <EmployeeUsers />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/data-cleanup">
+          <ProtectedRoute allowedRoles={["superadmin"]}>
+            <DataCleanup />
           </ProtectedRoute>
         </Route>
 
@@ -84,6 +97,11 @@ function Router() {
         <Route path="/profile">
           <ProtectedRoute allowedRoles={["employee"]}>
             <Profile />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/permission-request">
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <PermissionRequest />
           </ProtectedRoute>
         </Route>
 

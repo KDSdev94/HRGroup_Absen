@@ -16,6 +16,8 @@ import {
   Sun,
   Moon,
   Users2,
+  Eraser,
+  CalendarPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -200,6 +202,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       roles: ["superadmin"],
     },
     {
+      icon: CalendarPlus,
+      label: "Izin Peserta",
+      href: "/admin/permissions",
+      roles: ["superadmin", "admin"],
+    },
+    {
       icon: QrCode,
       label: "Scan Absensi",
       href: "/scan",
@@ -209,6 +217,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       icon: History,
       label: "Riwayat Absensi",
       href: "/attendance-history",
+      roles: ["employee"],
+    },
+    {
+      icon: CalendarPlus,
+      label: "Pengajuan Izin",
+      href: "/permission-request",
       roles: ["employee"],
     },
     {

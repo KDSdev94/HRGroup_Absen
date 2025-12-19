@@ -10,7 +10,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Mail, User, Search, AlertTriangle, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import {
+  Trash2,
+  Mail,
+  User,
+  Search,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -20,6 +29,8 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { formatDateTable } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -46,11 +57,15 @@ interface DataInconsistency {
 
 export default function DataCleanup() {
   const [cleanupUsers, setCleanupUsers] = useState<CleanupUser[]>([]);
-  const [inconsistencies, setInconsistencies] = useState<DataInconsistency[]>([]);
+  const [inconsistencies, setInconsistencies] = useState<DataInconsistency[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [scanningData, setScanningData] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"incomplete" | "inconsistencies">("incomplete");
+  const [activeTab, setActiveTab] = useState<
+    "incomplete" | "inconsistencies" | "fix_batch3"
+  >("incomplete");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -175,7 +190,7 @@ export default function DataCleanup() {
     try {
       setScanningData(true);
       console.log("🔍 Starting data consistency scan...");
-      
+
       const issues: DataInconsistency[] = [];
 
       // Get all users from Firestore
@@ -201,7 +216,7 @@ export default function DataCleanup() {
           const employeeExists = allEmployees.some(
             (emp) => emp.id === user.employeeId
           );
-          
+
           if (!employeeExists) {
             issues.push({
               type: "missing_employee_ref",
@@ -218,7 +233,7 @@ export default function DataCleanup() {
       for (const employee of allEmployees) {
         if (employee.uid) {
           const userExists = allUsers.some((user) => user.id === employee.uid);
-          
+
           if (!userExists) {
             issues.push({
               type: "orphaned_auth",
@@ -276,7 +291,7 @@ export default function DataCleanup() {
           });
         }
       }
-      
+
       // Rescan after fix
       await scanDataInconsistencies();
     } catch (error) {
@@ -342,6 +357,126 @@ export default function DataCleanup() {
     }
   };
 
+  const fixBatch3Collision = async () => {
+    if (
+      !confirm(
+        "Tindakan ini akan memindahkan Dita (DAK14 -> DAK16) dan Ni'matun (DAK15 -> DAK17), serta mengembalikan data Endang (DAK14) dan Nurul (DAK15).\n\nLanjutkan?"
+      )
+    )
+      return;
+
+    setLoading(true);
+    try {
+      // 1. FIX DAK14 (Endang vs Dita)
+      // Dita currently occupies DAK14
+      const ditaQuery = query(
+        collection(db, "users"),
+        where("email", "==", "ditaoktvn275@gmail.com")
+      );
+      const ditaSnap = await getDocs(ditaQuery);
+
+      if (!ditaSnap.empty) {
+        const ditaUser = ditaSnap.docs[0];
+        // Check if Dita is indeed pointing to DAK14 or if we need to grab data from DAK14 anyway
+        const currentDAK14 = await getDoc(doc(db, "employees", "DAK14"));
+
+        if (currentDAK14.exists()) {
+          const ditaData = currentDAK14.data();
+          // Only proceed if this looks like Dita's data or we are sure
+          // But since we know the state, we proceed.
+
+          const newDitaId = "DAK16";
+
+          // Move Dita to DAK16
+          await setDoc(doc(db, "employees", newDitaId), {
+            ...ditaData,
+            employeeId: newDitaId,
+            name: "Dita Ayu Oktaviani",
+          });
+
+          // Update Dita's user
+          await updateDoc(doc(db, "users", ditaUser.id), {
+            employeeId: newDitaId,
+          });
+
+          // Restore Endang to DAK14
+          await setDoc(doc(db, "employees", "DAK14"), {
+            employeeId: "DAK14",
+            name: "Endang Rahmawati Safitri",
+            division: "Akuntansi & Keuangan",
+            batch: "Batch 3",
+            createdAt: new Date().toISOString(),
+          });
+
+          console.log(
+            "✅ Fixed DAK14 collision (Moved Dita to DAK16, Restored Endang)"
+          );
+        }
+      }
+
+      // 2. FIX DAK15 (Nurul vs Ni'matun)
+      // Ni'matun currently occupies DAK15
+      const nimatunQuery = query(
+        collection(db, "users"),
+        where("email", "==", "alannimah16@gmail.com")
+      );
+      const nimatunSnap = await getDocs(nimatunQuery);
+
+      if (!nimatunSnap.empty) {
+        const nimatunUser = nimatunSnap.docs[0];
+        const currentDAK15 = await getDoc(doc(db, "employees", "DAK15"));
+
+        if (currentDAK15.exists()) {
+          const nimatunData = currentDAK15.data();
+          const newNimatunId = "DAK17";
+
+          // Move Ni'matun to DAK17
+          await setDoc(doc(db, "employees", newNimatunId), {
+            ...nimatunData,
+            employeeId: newNimatunId,
+            name: "Ni'matun Alan Ni'mah",
+          });
+
+          // Update Ni'matun's user
+          await updateDoc(doc(db, "users", nimatunUser.id), {
+            employeeId: newNimatunId,
+          });
+
+          // Restore Nurul to DAK15
+          await setDoc(doc(db, "employees", "DAK15"), {
+            employeeId: "DAK15",
+            name: "Nurul Hidayah",
+            division: "Akuntansi & Keuangan",
+            batch: "Batch 3",
+            createdAt: new Date().toISOString(),
+          });
+
+          console.log(
+            "✅ Fixed DAK15 collision (Moved Ni'matun to DAK17, Restored Nurul)"
+          );
+        }
+      }
+
+      toast({
+        title: "Perbaikan Berhasil",
+        description:
+          "Data Dita (DAK16), Ni'matun (DAK17), Endang (DAK14), Nurul (DAK15) telah diperbaiki.",
+      });
+
+      // Refresh data
+      fetchCleanupUsers();
+    } catch (error) {
+      console.error("Error fixing batch 3 collision v2:", error);
+      toast({
+        title: "Error",
+        description: "Gagal memperbaiki data.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredUsers = cleanupUsers.filter((user) => {
     const matchesSearch =
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -360,8 +495,6 @@ export default function DataCleanup() {
     return matchesSearch;
   });
 
-
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -369,7 +502,8 @@ export default function DataCleanup() {
           Pembersihan Data
         </h1>
         <p className="text-gray-500 mt-2">
-          Kelola dan perbaiki akun user yang tidak lengkap atau data yang tidak konsisten di database.
+          Kelola dan perbaiki akun user yang tidak lengkap atau data yang tidak
+          konsisten di database.
         </p>
       </div>
 
@@ -395,6 +529,16 @@ export default function DataCleanup() {
         >
           Masalah Data ({inconsistencies.length})
         </button>
+        <button
+          onClick={() => setActiveTab("fix_batch3")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === "fix_batch3"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Fix Batch 3 Error
+        </button>
       </div>
 
       {/* Search and Bulk Action Bar */}
@@ -408,7 +552,7 @@ export default function DataCleanup() {
             className="pl-10"
           />
         </div>
-        
+
         {/* Tab-specific actions */}
         {activeTab === "incomplete" && cleanupUsers.length > 0 && (
           <Button
@@ -420,7 +564,7 @@ export default function DataCleanup() {
             Hapus Semua ({cleanupUsers.length})
           </Button>
         )}
-        
+
         {activeTab === "inconsistencies" && (
           <>
             <Button
@@ -429,7 +573,9 @@ export default function DataCleanup() {
               variant="outline"
               className="gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${scanningData ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${scanningData ? "animate-spin" : ""}`}
+              />
               {scanningData ? "Scanning..." : "Scan Data"}
             </Button>
             {inconsistencies.length > 0 && (
@@ -451,109 +597,113 @@ export default function DataCleanup() {
       {activeTab === "incomplete" && (
         <Card>
           <CardHeader>
-            <CardTitle>
-              Akun Tidak Lengkap ({filteredUsers.length})
-            </CardTitle>
+            <CardTitle>Akun Tidak Lengkap ({filteredUsers.length})</CardTitle>
           </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">Memuat daftar user...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 mb-4">
-                <svg
-                  className="w-8 h-8 text-green-600 dark:text-green-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Memuat daftar user...</p>
               </div>
-              <p className="text-gray-900 dark:text-white font-semibold text-lg">
-                Database Bersih!
-              </p>
-              <p className="text-gray-500 mt-1">
-                {cleanupUsers.length === 0
-                  ? "Tidak ada user yang perlu dibersihkan."
-                  : "Tidak ada user yang cocok dengan pencarian."}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Divisi</TableHead>
-                    <TableHead>ID Peserta</TableHead>
-                    <TableHead>Terdaftar</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          {user.email}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          {user.name || (
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 mb-4">
+                  <svg
+                    className="w-8 h-8 text-green-600 dark:text-green-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+                <p className="text-gray-900 dark:text-white font-semibold text-lg">
+                  Database Bersih!
+                </p>
+                <p className="text-gray-500 mt-1">
+                  {cleanupUsers.length === 0
+                    ? "Tidak ada user yang perlu dibersihkan."
+                    : "Tidak ada user yang cocok dengan pencarian."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Divisi</TableHead>
+                      <TableHead>ID Peserta</TableHead>
+                      <TableHead>Terdaftar</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-gray-400" />
+                            {user.email}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-gray-400" />
+                            {user.name || (
+                              <span className="text-red-500 italic">
+                                Tidak ada
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.division || (
                             <span className="text-red-500 italic">
                               Tidak ada
                             </span>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {user.division || (
-                          <span className="text-red-500 italic">Tidak ada</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {user.employeeId ? (
-                          <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                            {user.employeeId}
-                          </span>
-                        ) : (
-                          <span className="text-red-500 italic">Tidak ada</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {formatDateTable(user.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteUser(user.id, user.email)}
-                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Hapus
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        </TableCell>
+                        <TableCell>
+                          {user.employeeId ? (
+                            <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                              {user.employeeId}
+                            </span>
+                          ) : (
+                            <span className="text-red-500 italic">
+                              Tidak ada
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {formatDateTable(user.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteUser(user.id, user.email)
+                            }
+                            className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Hapus
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* TAB 2: DATA INCONSISTENCIES */}
@@ -584,7 +734,8 @@ export default function DataCleanup() {
                       Belum ada scan
                     </p>
                     <p className="text-gray-500 mt-1">
-                      Klik tombol "Scan Data" di atas untuk memulai pemeriksaan data.
+                      Klik tombol "Scan Data" di atas untuk memulai pemeriksaan
+                      data.
                     </p>
                   </>
                 ) : (
@@ -640,6 +791,60 @@ export default function DataCleanup() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TAB 3: FIX BATCH 3 */}
+      {activeTab === "fix_batch3" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Perbaikan Data Batch 3 (Human Error)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                  Masalah yang Terdeteksi:
+                </h3>
+                <ul className="list-disc list-inside text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                  <li>
+                    <strong>DAK14:</strong> Data Endang tertimpa oleh Dita.
+                  </li>
+                  <li>
+                    <strong>DAK15:</strong> Data Nurul tertimpa oleh Ni'matun.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
+                <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
+                  Solusi yang akan dijalankan:
+                </h3>
+                <ul className="list-disc list-inside text-sm text-green-800 dark:text-green-200 space-y-1">
+                  <li>
+                    Memindahkan <strong>Dita</strong> dari DAK14 ke{" "}
+                    <strong>DAK16</strong>.
+                  </li>
+                  <li>
+                    Memindahkan <strong>Ni'matun</strong> dari DAK15 ke{" "}
+                    <strong>DAK17</strong>.
+                  </li>
+                  <li>
+                    Mengembalikan <strong>Endang Rahmawati Safitri</strong> ke{" "}
+                    <strong>DAK14</strong>.
+                  </li>
+                  <li>
+                    Mengembalikan <strong>Nurul Hidayah</strong> ke{" "}
+                    <strong>DAK15</strong>.
+                  </li>
+                </ul>
+              </div>
+
+              <Button onClick={fixBatch3Collision} disabled={loading}>
+                {loading ? "Memproses..." : "Jalankan Perbaikan"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
