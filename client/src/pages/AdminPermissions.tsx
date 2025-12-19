@@ -208,10 +208,7 @@ export default function AdminPermissions() {
                         })}
                       </TableCell>
                       <TableCell>{getTypeLabel(permission.type)}</TableCell>
-                      <TableCell
-                        className="max-w-[200px] truncate"
-                        title={permission.description}
-                      >
+                      <TableCell className="whitespace-pre-wrap">
                         {permission.description}
                       </TableCell>
                       <TableCell>{getStatusBadge(permission.status)}</TableCell>

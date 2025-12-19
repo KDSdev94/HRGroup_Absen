@@ -214,8 +214,12 @@ export default function DashboardEmployee() {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
 
-      // Execute attendance queries in parallel
-      const [todayAttendanceSnapshot, recentSnapshot] = await Promise.all([
+      // Execute attendance and permissions queries in parallel
+      const [
+        todayAttendanceSnapshot,
+        recentSnapshot,
+        todayPermissionsSnapshot,
+      ] = await Promise.all([
         // Query today's attendance
         getDocs(
           query(
@@ -225,12 +229,19 @@ export default function DashboardEmployee() {
           )
         ),
         // Query all attendance for this employee (filter by date on client side)
-        // This avoids composite index requirement while index is building
         getDocs(
           query(
             collection(db, "attendance"),
             where("employeeId", "==", employeeId),
             limit(50) // Get last 50 records, filter client-side
+          )
+        ),
+        // Query today's permissions
+        getDocs(
+          query(
+            collection(db, "permissions"),
+            where("employeeId", "==", employeeId),
+            where("date", "==", today)
           )
         ),
       ]);
@@ -240,42 +251,68 @@ export default function DashboardEmployee() {
       let checkInTime = null;
       let checkOutTime = null;
       let isLate = false;
+      let permissionType = null;
 
-      todayAttendanceSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        if (data.type === "check-in") {
-          status = "present";
-          checkInTime = data.timestamp;
+      // Check permissions first
+      if (!todayPermissionsSnapshot.empty) {
+        const permissionData = todayPermissionsSnapshot.docs[0].data();
+        // If there is a permission, set status to permission type regardless of approval status (as requested)
+        // Or we can check status if needed. User said "SAAT ORANG TERNYATA UDAH SCAN ABSEN TAPI ABIS ITU MILIH ISI IZIN MAKA TAMPILAN DI DASHBOARD PESERTA/KARYAWAN BUKAN HADIR TAPI IZIN"
+        // This implies immediate feedback.
+        status = "permission";
+        permissionType = permissionData.type; // sakit, izin, lainnya
+      }
 
-          // Handle different timestamp formats
-          let timeStr = "00:00:00";
-          if (data.timestamp) {
-            // If it's a Firestore Timestamp object
-            if (
-              data.timestamp.toDate &&
-              typeof data.timestamp.toDate === "function"
-            ) {
-              const date = data.timestamp.toDate();
-              timeStr = date.toTimeString().split(" ")[0]; // Get HH:MM:SS
+      // If no permission, check attendance
+      if (status !== "permission") {
+        todayAttendanceSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.type === "check-in") {
+            status = "present";
+            checkInTime = data.timestamp;
+
+            // Handle different timestamp formats
+            let timeStr = "00:00:00";
+            if (data.timestamp) {
+              // If it's a Firestore Timestamp object
+              if (
+                data.timestamp.toDate &&
+                typeof data.timestamp.toDate === "function"
+              ) {
+                const date = data.timestamp.toDate();
+                timeStr = date.toTimeString().split(" ")[0]; // Get HH:MM:SS
+              }
+              // If it's a timestamp with seconds property
+              else if (data.timestamp.seconds) {
+                const date = new Date(data.timestamp.seconds * 1000);
+                timeStr = date.toTimeString().split(" ")[0];
+              }
+              // If it's already a string
+              else if (typeof data.timestamp === "string") {
+                timeStr = data.timestamp.split("T")[1] || "00:00:00";
+              }
             }
-            // If it's a timestamp with seconds property
-            else if (data.timestamp.seconds) {
-              const date = new Date(data.timestamp.seconds * 1000);
-              timeStr = date.toTimeString().split(" ")[0];
+
+            if (timeStr > "11:00:00") {
+              isLate = true;
             }
-            // If it's already a string
-            else if (typeof data.timestamp === "string") {
-              timeStr = data.timestamp.split("T")[1] || "00:00:00";
-            }
+          } else if (data.type === "check-out") {
+            checkOutTime = data.timestamp;
           }
-
-          if (timeStr > "11:00:00") {
-            isLate = true;
+        });
+      } else {
+        // If permission exists, we still might want to show check-in time if they scanned before permission?
+        // User said "SAAT ORANG TERNYATA UDAH SCAN ABSEN TAPI ABIS ITU MILIH ISI IZIN MAKA TAMPILAN DI DASHBOARD PESERTA/KARYAWAN BUKAN HADIR TAPI IZIN"
+        // So we prioritize permission status, but maybe we can still show times if they exist.
+        todayAttendanceSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.type === "check-in") {
+            checkInTime = data.timestamp;
+          } else if (data.type === "check-out") {
+            checkOutTime = data.timestamp;
           }
-        } else if (data.type === "check-out") {
-          checkOutTime = data.timestamp;
-        }
-      });
+        });
+      }
 
       // Process recent attendance and sort on client side
       const recentData = recentSnapshot.docs
@@ -311,6 +348,7 @@ export default function DashboardEmployee() {
         checkInTime,
         checkOutTime,
         isLate,
+        permissionType,
       };
 
       console.log("📊 Final stats object:", stats);
@@ -332,6 +370,7 @@ export default function DashboardEmployee() {
         checkInTime: null,
         checkOutTime: null,
         isLate: false,
+        permissionType: null,
       });
     } finally {
       setLoading(false);
@@ -354,7 +393,19 @@ export default function DashboardEmployee() {
     );
   }
 
-  const getStatusColor = (status: string, isLate: boolean) => {
+  const getStatusColor = (
+    status: string,
+    isLate: boolean,
+    permissionType?: string
+  ) => {
+    if (status === "permission") {
+      let label = "Izin";
+      if (permissionType === "sakit") label = "Sakit";
+      else if (permissionType === "izin") label = "Izin";
+      else if (permissionType === "lainnya") label = "Izin Lainnya";
+
+      return { bg: "bg-blue-100", text: "text-blue-800", label: label };
+    }
     if (status === "absent")
       return { bg: "bg-red-100", text: "text-red-800", label: "Tidak Hadir" };
     if (isLate)
@@ -372,7 +423,8 @@ export default function DashboardEmployee() {
 
   const statusColor = getStatusColor(
     employeeStats.status,
-    employeeStats.isLate
+    employeeStats.isLate,
+    employeeStats.permissionType
   );
 
   const formatTime = (timestamp: any) => {
@@ -540,6 +592,8 @@ export default function DashboardEmployee() {
               ? "#ef4444"
               : statusColor.bg.split("-")[1] === "orange"
               ? "#f59e0b"
+              : statusColor.bg.split("-")[1] === "blue"
+              ? "#3b82f6"
               : "#10b981",
         }}
       >
