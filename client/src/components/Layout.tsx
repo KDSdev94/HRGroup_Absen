@@ -264,9 +264,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           ${isCollapsed ? "lg:w-20" : "lg:w-64"}
-          w-64 sm:w-72
+          w-64
           flex flex-col
-          h-screen lg:h-auto lg:min-h-screen overflow-y-auto
+          h-screen lg:h-auto lg:min-h-screen
         `}
       >
         <div
@@ -318,7 +318,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="p-4 lg:p-2 lg:sm:p-3 space-y-2 flex-1 overflow-y-auto">
+        <nav className="p-4 lg:p-2 lg:sm:p-3 space-y-2 flex-1 overflow-y-auto overflow-x-hidden">
           <TooltipProvider delayDuration={0}>
             {navItems.map((item) => {
               const isActive = location === item.href;
@@ -335,6 +335,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50"
                           }
                           ${isCollapsed ? "lg:justify-center" : ""}
+                          overflow-hidden
                         `}
                         onClick={() => setSidebarOpen(false)}
                       >
@@ -390,7 +391,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div
-          className={`p-5 lg:p-3 lg:sm:p-4 border-t border-gray-200 dark:border-gray-700 ${
+          className={`p-5 lg:p-3 lg:sm:p-4 border-t border-gray-200 dark:border-gray-700 overflow-hidden ${
             isCollapsed ? "lg:items-center" : ""
           }`}
         >

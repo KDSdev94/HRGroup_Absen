@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -238,7 +239,7 @@ export default function Login() {
       console.log("📱 Device:", isMobile ? "Mobile" : "Desktop");
       console.log("🌐 User Agent:", navigator.userAgent);
       console.log("📏 Online status:", navigator.onLine);
-      
+
       await login(email, password, remember);
 
       console.log("✅ Login successful, redirecting...");
@@ -277,9 +278,11 @@ export default function Login() {
       } else if (!isOnline) {
         errorMessage = "Koneksi internet terputus. Periksa jaringan Anda.";
       } else if (error.code === "auth/internal-error") {
-        errorMessage = "Terjadi kesalahan internal. Coba refresh halaman dan login kembali.";
+        errorMessage =
+          "Terjadi kesalahan internal. Coba refresh halaman dan login kembali.";
       } else if (error.message && error.message.includes("CORS")) {
-        errorMessage = "Masalah koneksi. Pastikan domain sudah terdaftar di Firebase Console.";
+        errorMessage =
+          "Masalah koneksi. Pastikan domain sudah terdaftar di Firebase Console.";
       }
 
       toast({
@@ -311,7 +314,7 @@ export default function Login() {
       console.log("📱 Device:", isMobile ? "Mobile" : "Desktop");
       console.log("🌐 User Agent:", navigator.userAgent);
       console.log("📏 Online status:", navigator.onLine);
-      
+
       await loginWithGoogle();
 
       // For redirect flow (mobile), the function will return early
@@ -342,11 +345,14 @@ export default function Login() {
       } else if (!isOnline) {
         errorMessage = "Koneksi internet terputus. Periksa jaringan Anda.";
       } else if (error.code === "auth/internal-error") {
-        errorMessage = "Terjadi kesalahan internal. Coba refresh halaman dan login kembali.";
+        errorMessage =
+          "Terjadi kesalahan internal. Coba refresh halaman dan login kembali.";
       } else if (error.message && error.message.includes("CORS")) {
-        errorMessage = "Masalah koneksi. Pastikan domain sudah terdaftar di Firebase Console.";
+        errorMessage =
+          "Masalah koneksi. Pastikan domain sudah terdaftar di Firebase Console.";
       } else if (error.message && error.message.includes("redirect")) {
-        errorMessage = "Masalah redirect. Coba hapus cache browser dan coba lagi.";
+        errorMessage =
+          "Masalah redirect. Coba hapus cache browser dan coba lagi.";
       }
 
       toast({
@@ -476,14 +482,18 @@ export default function Login() {
 
             {/* REMEMBER ME & FORGOT PASSWORD */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember"
                   checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  onCheckedChange={(checked) => setRemember(checked as boolean)}
                 />
-                <span className="text-sm text-gray-600">Ingat Saya</span>
+                <label
+                  htmlFor="remember"
+                  className="text-sm text-gray-600 cursor-pointer select-none"
+                >
+                  Ingat Saya
+                </label>
               </div>
               <button
                 type="button"

@@ -82,16 +82,8 @@ export default function Register() {
         ...doc.data(),
       })) as Employee[];
 
-      console.log("📊 All employees:", employeesData);
-
       const unregisteredEmployees = employeesData.filter(
         (emp) => !emp.uid && !emp.email
-      );
-
-      console.log("✅ Unregistered employees:", unregisteredEmployees);
-      console.log(
-        "❌ Registered employees:",
-        employeesData.filter((emp) => emp.uid || emp.email)
       );
 
       setEmployees(unregisteredEmployees);
@@ -426,7 +418,9 @@ export default function Register() {
             <Button
               onClick={handleGoogleRegister}
               disabled={!selectedEmployeeId}
-              className={`w-full h-12 bg-white border text-black hover:bg-gray-100 ${!selectedEmployeeId ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`w-full h-12 bg-white border text-black hover:bg-gray-100 ${
+                !selectedEmployeeId ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               <img src="/google.png" alt="g" className="h-5 mr-2" />
               Lanjutkan dengan Google

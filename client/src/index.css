@@ -214,7 +214,7 @@
   }
 
   /* Fix for mobile Safari input rendering */
-  input {
+  input:not([type="checkbox"]):not([type="radio"]) {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;

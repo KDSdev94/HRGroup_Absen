@@ -14,6 +14,7 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   confirmPasswordReset,
+  getRedirectResult,
   Auth,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -92,24 +93,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleRedirectResult = async () => {
       try {
-        const { getRedirectResult } = await import("firebase/auth");
-        console.log("🔐 Checking for redirect result from Google login...");
-        console.log("📱 Current auth state:", auth.currentUser ? "Authenticated" : "Not authenticated");
-        
-        // Add timeout for getRedirectResult on slow mobile networks
         const redirectPromise = getRedirectResult(auth);
-        const timeoutPromise = new Promise((resolve) =>
-          setTimeout(() => {
-            console.log("⚠️ Redirect result check timeout - continuing without result");
-            resolve(null);
-          }, 10000) // 10 seconds timeout
+        const timeoutPromise = new Promise(
+          (resolve) =>
+            setTimeout(() => {
+              resolve(null);
+            }, 10000) // 10 seconds timeout
         );
-        
-        const result = (await Promise.race([redirectPromise, timeoutPromise])) as any;
+
+        const result = (await Promise.race([
+          redirectPromise,
+          timeoutPromise,
+        ])) as any;
 
         if (result && result.user) {
-          console.log("✅ Redirect result found for:", result.user.email);
-
           // Save email for "remember me" functionality
           if (result.user.email) {
             localStorage.setItem("rememberEmail", result.user.email);
@@ -124,21 +121,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
             role,
           };
           setCurrentUser(userData);
-          console.log("✅ Redirect login complete with role:", role);
-          
+
           // Dispatch custom event to notify Login page about successful redirect
           window.dispatchEvent(new Event("authRedirectComplete"));
-        } else {
-          console.log("ℹ️ No redirect result found (normal if not redirecting)");
         }
       } catch (error: any) {
         console.error("❌ Error handling redirect result:", error);
         console.error("Error code:", error.code);
         console.error("Error message:", error.message);
-        
+
         // Only log error if it's not a known "safe" error
-        if (error.code && error.code !== "auth/operation-not-supported-in-this-environment") {
-          console.error("⚠️ Redirect handling failed - user may need to login again");
+        if (
+          error.code &&
+          error.code !== "auth/operation-not-supported-in-this-environment"
+        ) {
+          console.error(
+            "⚠️ Redirect handling failed - user may need to login again"
+          );
         }
       }
     };
@@ -153,8 +152,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     rememberMe: boolean = false
   ) => {
     try {
-      console.log("🔐 Attempting login for:", email);
-
       // Retry logic for DNS/network issues
       let lastError: any = null;
       let attempt = 0;
@@ -162,16 +159,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       while (attempt < maxAttempts) {
         attempt++;
-        console.log(`🔄 Login attempt ${attempt}/${maxAttempts}`);
-        
+
         try {
           // Add timeout protection for slow mobile networks (45s for mobile)
-          const loginPromise = signInWithEmailAndPassword(auth, email, password);
+          const loginPromise = signInWithEmailAndPassword(
+            auth,
+            email,
+            password
+          );
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(
               () =>
                 reject(
-                  new Error("Login timeout - please check your internet connection")
+                  new Error(
+                    "Login timeout - please check your internet connection"
+                  )
                 ),
               45000 // Increased to 45 seconds for slow mobile networks
             )
@@ -183,50 +185,45 @@ export function UserProvider({ children }: { children: ReactNode }) {
           ])) as any;
           const user = result.user;
 
-      console.log("✅ Login successful for:", user.email);
+          // If rememberMe is checked, save the email to localStorage
+          if (rememberMe) {
+            localStorage.setItem("rememberEmail", email);
+          } else {
+            localStorage.removeItem("rememberEmail");
+          }
 
-      // If rememberMe is checked, save the email to localStorage
-      if (rememberMe) {
-        localStorage.setItem("rememberEmail", email);
-      } else {
-        localStorage.removeItem("rememberEmail");
-      }
+          const role = await getUserRole(user.uid);
+          const userData: User = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            role,
+          };
+          setCurrentUser(userData);
 
-      const role = await getUserRole(user.uid);
-      const userData: User = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        role,
-      };
-      setCurrentUser(userData);
-
-          console.log("✅ User data set with role:", role);
           return; // Success, exit retry loop
         } catch (error: any) {
           lastError = error;
-          console.error(`❌ Login attempt ${attempt} failed:`, error.code, error.message);
-          
+          console.error(
+            `❌ Login attempt ${attempt} failed:`,
+            error.code,
+            error.message
+          );
+
           // If it's a DNS or network error, retry
-          if (
-            error.code === "auth/network-request-failed" ||
-            error.message?.toLowerCase().includes("dns") ||
-            error.message?.toLowerCase().includes("network") ||
-            error.message?.toLowerCase().includes("fetch")
-          ) {
+          if (error.message?.toLowerCase().includes("fetch")) {
             if (attempt < maxAttempts) {
-              console.log(`⏳ Waiting 2 seconds before retry...`);
               await new Promise((resolve) => setTimeout(resolve, 2000));
               continue;
             }
           }
-          
+
           // For other errors, don't retry
           throw error;
         }
       }
-      
+
       // If all attempts failed, throw the last error
       throw lastError;
     } catch (error: any) {
@@ -240,8 +237,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Login with Google
   const loginWithGoogle = async () => {
     try {
-      console.log("🔐 Attempting Google login...");
-
       const provider = new GoogleAuthProvider();
 
       // Add custom parameters for better mobile support
@@ -253,26 +248,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
       if (isMobile) {
-        console.log("📱 Mobile detected - using redirect flow");
         // Import signInWithRedirect for mobile
         const { signInWithRedirect } = await import("firebase/auth");
 
         // Start the redirect flow with timeout
-        console.log("📱 Initiating Google Sign-In with redirect...");
         const redirectPromise = signInWithRedirect(auth, provider);
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
-            () => reject(new Error("Google redirect timeout - please try again")),
+            () =>
+              reject(new Error("Google redirect timeout - please try again")),
             45000 // 45 seconds for mobile
           )
         );
-        
+
         await Promise.race([redirectPromise, timeoutPromise]);
         // This will redirect the page, so code below won't execute
-        console.log("📱 Redirecting to Google...");
         return;
       } else {
-        console.log("💻 Desktop detected - using popup flow");
         // Add timeout for popup
         const popupPromise = signInWithPopup(auth, provider);
         const timeoutPromise = new Promise((_, reject) =>
@@ -288,7 +280,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         ])) as any;
 
         const user = result.user;
-        console.log("✅ Google login successful for:", user.email);
 
         // Save email for "remember me" functionality
         if (user.email) {
@@ -304,8 +295,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
           role,
         };
         setCurrentUser(userData);
-
-        console.log("✅ Google user data set with role:", role);
       }
     } catch (error: any) {
       console.error("❌ Google login error:", error);
