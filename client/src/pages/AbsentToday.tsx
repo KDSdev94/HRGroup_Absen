@@ -75,6 +75,23 @@ export default function AbsentToday() {
         query(collection(db, "attendance"), where("date", "==", targetDate))
       );
 
+      // Fetch approved permissions for the selected date
+      const permissionsSnapshot = await getDocs(
+        query(
+          collection(db, "permissions"),
+          where("date", "==", targetDate),
+          where("status", "==", "approved")
+        )
+      );
+
+      const permissionEmployeeIds = new Set<string>();
+      permissionsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.employeeId) {
+          permissionEmployeeIds.add(data.employeeId);
+        }
+      });
+
       const checkInEmployeeIds = new Set<string>();
       const checkOutEmployeeIds = new Set<string>();
 
@@ -87,12 +104,16 @@ export default function AbsentToday() {
         }
       });
 
-      // Find employees who haven't checked in
+      // Find employees who haven't checked in AND don't have approved permission
       const notCheckedInList = allEmployees.filter((emp) => {
-        return (
-          !checkInEmployeeIds.has(emp.id) &&
-          !checkInEmployeeIds.has(emp.employeeId || "")
-        );
+        const hasCheckedIn =
+          checkInEmployeeIds.has(emp.id) ||
+          checkInEmployeeIds.has(emp.employeeId || "");
+        const hasPermission =
+          permissionEmployeeIds.has(emp.id) ||
+          permissionEmployeeIds.has(emp.employeeId || "");
+
+        return !hasCheckedIn && !hasPermission;
       });
 
       // Find employees who checked in but haven't checked out
@@ -113,7 +134,7 @@ export default function AbsentToday() {
       setNotCheckedIn(notCheckedInList);
       setNotCheckedOut(notCheckedOutList);
     } catch (error) {
-      console.error("Error fetching absent employees:", error);
+      // Error fetching absent employees
     } finally {
       setLoading(false);
     }

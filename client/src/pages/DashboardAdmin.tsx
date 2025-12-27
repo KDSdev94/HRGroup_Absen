@@ -7,6 +7,7 @@ import {
   XCircle,
   Activity,
   TrendingUp,
+  FileText,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useLocation } from "wouter";
@@ -59,6 +60,7 @@ export default function DashboardAdmin() {
     presentToday: 0,
     lateToday: 0,
     absentToday: 0,
+    permissionToday: 0,
   });
   const [divisionData, setDivisionData] = useState<any[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -73,23 +75,13 @@ export default function DashboardAdmin() {
   }, [selectedDate]);
 
   const fetchAllData = async () => {
-    console.log("🔄 DashboardAdmin: Starting fetchAllData");
     try {
       // Fetch employees
-      console.log("📊 Fetching employees from Firestore...");
       const employeesSnapshot = await getDocs(collection(db, "employees"));
       const totalEmployees = employeesSnapshot.size;
-      console.log("✅ Total employees found:", totalEmployees);
 
       const employeesData = employeesSnapshot.docs.map((doc) => {
         const data = doc.data();
-        console.log(
-          "👤 Employee:",
-          doc.id,
-          data.name,
-          "Division:",
-          data.division
-        );
         return {
           id: doc.id,
           ...data,
@@ -99,13 +91,30 @@ export default function DashboardAdmin() {
       // Get today's date in YYYY-MM-DD format
       // Determine target date (use selectedDate from state)
       const todayStr = selectedDate || new Date().toISOString().split("T")[0];
-      console.log("📅 Target date for stats:", todayStr);
 
       // Fetch attendance for today
-      console.log("📊 Fetching today's attendance...");
       const attendanceSnapshot = await getDocs(
         query(collection(db, "attendance"), where("date", "==", todayStr))
       );
+
+      // Fetch permissions for today
+      const permissionsSnapshot = await getDocs(
+        query(
+          collection(db, "permissions"),
+          where("date", "==", todayStr),
+          where("status", "==", "approved")
+        )
+      );
+
+      const permissionEmployeeIds = new Set<string>();
+      permissionsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.employeeId) {
+          permissionEmployeeIds.add(data.employeeId);
+        }
+      });
+
+      const permissionToday = permissionEmployeeIds.size;
 
       // Calculate late arrivals (check-in after 11:00 AM) and unique present employees
       let late = 0;
@@ -151,14 +160,11 @@ export default function DashboardAdmin() {
 
           if (isLate) {
             late++;
-            console.log("⏰ Late check-in:", data.employeeName, checkInTime);
           }
         }
       });
 
       const presentToday = presentEmployeeIds.size;
-      console.log("✅ Present today (unique employees):", presentToday);
-      console.log("📊 Late arrivals:", late);
 
       // Calculate division breakdown
       const divisionCounts: { [key: string]: number } = {};
@@ -167,17 +173,12 @@ export default function DashboardAdmin() {
         divisionCounts[division] = (divisionCounts[division] || 0) + 1;
       });
 
-      console.log("📊 Division breakdown:", divisionCounts);
-
       const chartData = Object.entries(divisionCounts).map(([name, value]) => ({
         name,
         value,
       }));
 
-      console.log("📊 Chart data:", chartData);
-
       // Fetch recent activities - Get from attendance records (check-in/check-out)
-      console.log("📊 Fetching recent activities from attendance...");
 
       // Get recent attendance records to show employee check-in/check-out activities
       const recentAttendance = await getDocs(
@@ -224,29 +225,30 @@ export default function DashboardAdmin() {
           };
         }) as Activity[];
 
-      console.log("✅ Activities found:", activitiesList.length);
+      // Calculate union of present and permission for accurate absent count
+      const presentOrPermission = new Set([
+        ...Array.from(presentEmployeeIds),
+        ...Array.from(permissionEmployeeIds),
+      ]);
+      const absentToday = Math.max(
+        0,
+        totalEmployees - presentOrPermission.size
+      );
 
       const stats = {
         totalEmployees,
         presentToday,
         lateToday: late,
-        absentToday: totalEmployees - presentToday,
+        permissionToday,
+        absentToday: absentToday,
       };
-
-      console.log("✅ Final stats:", stats);
 
       setStats(stats);
       setDivisionData(chartData);
       setActivities(activitiesList);
     } catch (error) {
-      console.error("❌ Error fetching data:", error);
-      // Log the full error for debugging
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
+      // Error handling without console logs
     } finally {
-      console.log("✅ DashboardAdmin: Finished loading");
       setLoadingStats(false);
     }
   };
@@ -357,7 +359,7 @@ export default function DashboardAdmin() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <StatCard
           title="Total Peserta"
           value={stats.totalEmployees}
@@ -381,6 +383,14 @@ export default function DashboardAdmin() {
           color="#f59e0b"
           subtext={`Terlambat (${selectedDate})`}
           onClick={() => setLocation(`/attendance/late?date=${selectedDate}`)}
+        />
+        <StatCard
+          title="Izin"
+          value={stats.permissionToday}
+          icon={FileText}
+          color="#8b5cf6"
+          subtext={`Izin disetujui (${selectedDate})`}
+          onClick={() => setLocation("/admin/permissions")}
         />
         <StatCard
           title="Tidak Hadir"
@@ -517,82 +527,78 @@ export default function DashboardAdmin() {
                         "drop-shadow(0 10px 25px rgba(0, 0, 0, 0.15)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.1))",
                     }}
                   >
-                    <ResponsiveContainer width={220} height={220}>
-                      <PieChart>
-                        <defs>
-                          {divisionData.map((entry, index) => {
-                            const color =
+                    <PieChart width={220} height={220}>
+                      <defs>
+                        {divisionData.map((entry, index) => {
+                          const color =
+                            DIVISION_COLORS[entry.name] ||
+                            COLORS[index % COLORS.length];
+                          return (
+                            <filter
+                              key={`shadow-${index}`}
+                              id={`shadow-${index}`}
+                              height="150%"
+                            >
+                              <feGaussianBlur
+                                in="SourceAlpha"
+                                stdDeviation="3"
+                              />
+                              <feOffset dx="0" dy="2" result="offsetblur" />
+                              <feComponentTransfer>
+                                <feFuncA type="linear" slope="0.3" />
+                              </feComponentTransfer>
+                              <feMerge>
+                                <feMergeNode />
+                                <feMergeNode in="SourceGraphic" />
+                              </feMerge>
+                            </filter>
+                          );
+                        })}
+                      </defs>
+                      <Pie
+                        data={divisionData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={90}
+                        innerRadius={55}
+                        fill="#8884d8"
+                        dataKey="value"
+                        paddingAngle={3}
+                        strokeWidth={0}
+                      >
+                        {divisionData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={
                               DIVISION_COLORS[entry.name] ||
-                              COLORS[index % COLORS.length];
-                            return (
-                              <filter
-                                key={`shadow-${index}`}
-                                id={`shadow-${index}`}
-                                height="150%"
-                              >
-                                <feGaussianBlur
-                                  in="SourceAlpha"
-                                  stdDeviation="3"
-                                />
-                                <feOffset dx="0" dy="2" result="offsetblur" />
-                                <feComponentTransfer>
-                                  <feFuncA type="linear" slope="0.3" />
-                                </feComponentTransfer>
-                                <feMerge>
-                                  <feMergeNode />
-                                  <feMergeNode in="SourceGraphic" />
-                                </feMerge>
-                              </filter>
-                            );
-                          })}
-                        </defs>
-                        <Pie
-                          data={divisionData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={90}
-                          innerRadius={55}
-                          fill="#8884d8"
-                          dataKey="value"
-                          paddingAngle={3}
-                          strokeWidth={0}
-                        >
-                          {divisionData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={
-                                DIVISION_COLORS[entry.name] ||
-                                COLORS[index % COLORS.length]
-                              }
-                              className="transition-all hover:opacity-90"
-                              style={{
-                                filter: "brightness(1.05)",
-                              }}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "rgba(255, 255, 255, 0.98)",
-                            border: "none",
-                            borderRadius: "12px",
-                            padding: "12px 16px",
-                            boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
-                          }}
-                          formatter={(value: any, name: string) => {
-                            const total = divisionData.reduce(
-                              (sum, item) => sum + item.value,
-                              0
-                            );
-                            const percentage = ((value / total) * 100).toFixed(
-                              1
-                            );
-                            return [`${value} orang (${percentage}%)`, name];
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                              COLORS[index % COLORS.length]
+                            }
+                            className="transition-all hover:opacity-90"
+                            style={{
+                              filter: "brightness(1.05)",
+                            }}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "rgba(255, 255, 255, 0.98)",
+                          border: "none",
+                          borderRadius: "12px",
+                          padding: "12px 16px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                        }}
+                        formatter={(value: any, name: string) => {
+                          const total = divisionData.reduce(
+                            (sum, item) => sum + item.value,
+                            0
+                          );
+                          const percentage = ((value / total) * 100).toFixed(1);
+                          return [`${value} orang (${percentage}%)`, name];
+                        }}
+                      />
+                    </PieChart>
                   </div>
                 </div>
 
