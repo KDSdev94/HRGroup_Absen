@@ -8,6 +8,9 @@ import {
   Activity,
   TrendingUp,
   FileText,
+  Plus,
+  Upload,
+  QrCode,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useLocation } from "wouter";
@@ -18,8 +21,32 @@ import {
   getDocs,
   orderBy,
   limit,
+  addDoc,
+  serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Html5Qrcode } from "html5-qrcode";
+import { useToast } from "@/hooks/use-toast";
+import { getCompleteLocation } from "@/utils/gpsUtils";
 
 interface Activity {
   id: string;
@@ -54,6 +81,7 @@ const COLORS = [
 ];
 
 export default function DashboardAdmin() {
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [stats, setStats] = useState({
     totalEmployees: 0,
@@ -69,6 +97,22 @@ export default function DashboardAdmin() {
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().split("T")[0]
   );
+
+  // Manual Attendance State
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    employeeId: "",
+    date: new Date().toISOString().split("T")[0],
+    checkInHour: "08",
+    checkInMinute: "00",
+    checkOutHour: "17",
+    checkOutMinute: "00",
+    enableCheckIn: true,
+    enableCheckOut: false,
+  });
+  const [isProcessingQR, setIsProcessingQR] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchAllData();
@@ -87,6 +131,8 @@ export default function DashboardAdmin() {
           ...data,
         };
       }) as any[];
+
+      setEmployees(employeesData);
 
       // Get today's date in YYYY-MM-DD format
       // Determine target date (use selectedDate from state)
@@ -335,6 +381,182 @@ export default function DashboardAdmin() {
     }
   };
 
+  const handleManualSubmit = async () => {
+    if (!manualForm.employeeId || !manualForm.date) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Mohon pilih karyawan dan tanggal.",
+      });
+      return;
+    }
+
+    if (!manualForm.enableCheckIn && !manualForm.enableCheckOut) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          "Mohon pilih setidaknya satu jenis absen (Masuk atau Pulang).",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const selectedEmployee = employees.find(
+        (e) => e.id === manualForm.employeeId
+      );
+      if (!selectedEmployee) throw new Error("Karyawan tidak ditemukan");
+
+      // Get Admin Location
+      let locationData = {
+        obtained: false,
+        address: "Manual Entry by Admin",
+        latitude: 0,
+        longitude: 0,
+      };
+
+      try {
+        const gps = await getCompleteLocation(false);
+        if (gps.obtained) {
+          locationData = {
+            obtained: true,
+            address: gps.address || "Lokasi Admin Terdeteksi",
+            latitude: gps.latitude,
+            longitude: gps.longitude,
+          };
+        }
+      } catch (err) {
+        console.warn("Could not get admin location, using default");
+      }
+
+      const promises = [];
+
+      // Handle Check In
+      if (manualForm.enableCheckIn) {
+        const checkInTimeStr = `${manualForm.checkInHour}:${manualForm.checkInMinute}`;
+        const checkInDateTime = new Date(
+          `${manualForm.date}T${checkInTimeStr}`
+        );
+
+        // Determine status (late logic)
+        const day = checkInDateTime.getDay();
+        const hour = parseInt(manualForm.checkInHour);
+        const minute = parseInt(manualForm.checkInMinute);
+        const timeDecimal = hour + minute / 60;
+
+        let isLate = false;
+        if (day === 1) {
+          // Monday
+          if (timeDecimal > 8.5) isLate = true; // > 08:30
+        } else {
+          if (timeDecimal > 7.5) isLate = true; // > 07:30
+        }
+
+        promises.push(
+          addDoc(collection(db, "attendance"), {
+            employeeId: selectedEmployee.id,
+            employeeName: selectedEmployee.name,
+            division: selectedEmployee.division,
+            timestamp: Timestamp.fromDate(checkInDateTime),
+            date: manualForm.date,
+            type: "check-in",
+            status: isLate ? "late" : "on-time",
+            location: locationData,
+            isManualEntry: true,
+            createdBy: "admin",
+          })
+        );
+      }
+
+      // Handle Check Out
+      if (manualForm.enableCheckOut) {
+        const checkOutTimeStr = `${manualForm.checkOutHour}:${manualForm.checkOutMinute}`;
+        const checkOutDateTime = new Date(
+          `${manualForm.date}T${checkOutTimeStr}`
+        );
+
+        promises.push(
+          addDoc(collection(db, "attendance"), {
+            employeeId: selectedEmployee.id,
+            employeeName: selectedEmployee.name,
+            division: selectedEmployee.division,
+            timestamp: Timestamp.fromDate(checkOutDateTime),
+            date: manualForm.date,
+            type: "check-out",
+            status: "on-time",
+            location: locationData,
+            isManualEntry: true,
+            createdBy: "admin",
+          })
+        );
+      }
+
+      await Promise.all(promises);
+
+      toast({
+        title: "Berhasil",
+        description: "Data absensi berhasil ditambahkan.",
+      });
+
+      setIsManualOpen(false);
+      // Reset form but keep date
+      setManualForm((prev) => ({
+        ...prev,
+        employeeId: "",
+        enableCheckIn: true,
+        enableCheckOut: false,
+      }));
+      fetchAllData(); // Refresh stats
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Gagal",
+        description: error.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleQRUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingQR(true);
+    try {
+      const html5QrCode = new Html5Qrcode("reader-hidden");
+      const result = await html5QrCode.scanFile(file, false);
+
+      const data = JSON.parse(result);
+      if (data.id) {
+        const emp = employees.find((e) => e.id === data.id);
+        if (emp) {
+          setManualForm((prev) => ({ ...prev, employeeId: emp.id }));
+          toast({
+            title: "QR Terdeteksi",
+            description: `Karyawan: ${emp.name}`,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Karyawan tidak ditemukan dalam database.",
+          });
+        }
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Gagal Scan QR",
+        description: "Tidak dapat membaca QR code dari gambar.",
+      });
+    } finally {
+      setIsProcessingQR(false);
+    }
+  };
+
   return (
     <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="space-y-1 sm:space-y-2">
@@ -355,6 +577,217 @@ export default function DashboardAdmin() {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="flex-1 md:flex-none px-2 py-1 rounded border bg-white dark:bg-gray-800 text-sm"
             />
+
+            <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default" size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Absen Manual
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Absensi Manual</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Peserta</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={manualForm.employeeId}
+                        onValueChange={(val) =>
+                          setManualForm({ ...manualForm, employeeId: val })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Pilih Peserta" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {employees.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.name} - {emp.division}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleQRUpload}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          disabled={isProcessingQR}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          disabled={isProcessingQR}
+                        >
+                          {isProcessingQR ? (
+                            <QrCode className="h-4 w-4 animate-pulse" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Pilih peserta atau upload QR Code peserta.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Tanggal</Label>
+                    <Input
+                      type="date"
+                      value={manualForm.date}
+                      onChange={(e) =>
+                        setManualForm({ ...manualForm, date: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Check In Section */}
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Jam Masuk (WIB)</Label>
+                        <input
+                          type="checkbox"
+                          checked={manualForm.enableCheckIn}
+                          onChange={(e) =>
+                            setManualForm({
+                              ...manualForm,
+                              enableCheckIn: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex gap-1">
+                        <Select
+                          value={manualForm.checkInHour}
+                          onValueChange={(val) =>
+                            setManualForm({ ...manualForm, checkInHour: val })
+                          }
+                          disabled={!manualForm.enableCheckIn}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Jam" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {Array.from({ length: 24 }, (_, i) =>
+                              i.toString().padStart(2, "0")
+                            ).map((hour) => (
+                              <SelectItem key={hour} value={hour}>
+                                {hour}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="flex items-center text-lg font-bold">
+                          :
+                        </span>
+                        <Select
+                          value={manualForm.checkInMinute}
+                          onValueChange={(val) =>
+                            setManualForm({ ...manualForm, checkInMinute: val })
+                          }
+                          disabled={!manualForm.enableCheckIn}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Menit" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {Array.from({ length: 60 }, (_, i) =>
+                              i.toString().padStart(2, "0")
+                            ).map((min) => (
+                              <SelectItem key={min} value={min}>
+                                {min}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Check Out Section */}
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Jam Pulang (WIB)</Label>
+                        <input
+                          type="checkbox"
+                          checked={manualForm.enableCheckOut}
+                          onChange={(e) =>
+                            setManualForm({
+                              ...manualForm,
+                              enableCheckOut: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex gap-1">
+                        <Select
+                          value={manualForm.checkOutHour}
+                          onValueChange={(val) =>
+                            setManualForm({ ...manualForm, checkOutHour: val })
+                          }
+                          disabled={!manualForm.enableCheckOut}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Jam" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {Array.from({ length: 24 }, (_, i) =>
+                              i.toString().padStart(2, "0")
+                            ).map((hour) => (
+                              <SelectItem key={hour} value={hour}>
+                                {hour}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="flex items-center text-lg font-bold">
+                          :
+                        </span>
+                        <Select
+                          value={manualForm.checkOutMinute}
+                          onValueChange={(val) =>
+                            setManualForm({
+                              ...manualForm,
+                              checkOutMinute: val,
+                            })
+                          }
+                          disabled={!manualForm.enableCheckOut}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Menit" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {Array.from({ length: 60 }, (_, i) =>
+                              i.toString().padStart(2, "0")
+                            ).map((min) => (
+                              <SelectItem key={min} value={min}>
+                                {min}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleManualSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? "Menyimpan..." : "Simpan Absensi"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Hidden div for QR scanning */}
+            <div id="reader-hidden" className="hidden"></div>
           </div>
         </div>
       </div>
