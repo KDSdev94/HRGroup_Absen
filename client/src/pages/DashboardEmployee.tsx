@@ -247,7 +247,25 @@ export default function DashboardEmployee() {
       ]);
 
       // Process today's attendance
-      let status = "absent";
+      // Check current time to determine if we should mark as absent
+      const now = new Date();
+      const wibString = now.toLocaleString("en-US", {
+        timeZone: "Asia/Jakarta",
+      });
+      const wibDate = new Date(wibString);
+      const currentHour = wibDate.getHours();
+      const currentMinute = wibDate.getMinutes();
+      const currentTime = currentHour + currentMinute / 60;
+      const currentDay = wibDate.getDay();
+
+      // Determine check-in end time based on day
+      let checkInEndTime = 9.0; // 09:00 for Tue-Sat
+      if (currentDay === 1) {
+        checkInEndTime = 10.0; // 10:00 for Monday
+      }
+
+      // Default status: if still within check-in time, show "pending", otherwise "absent"
+      let status = currentTime <= checkInEndTime ? "pending" : "absent";
       let checkInTime = null;
       let checkOutTime = null;
       let isLate = false;
@@ -293,7 +311,19 @@ export default function DashboardEmployee() {
               }
             }
 
-            if (timeStr > "11:00:00") {
+            let threshold = "09:00:00";
+            if (data.timestamp) {
+              let date: Date | null = null;
+              if (data.timestamp.toDate) date = data.timestamp.toDate();
+              else if (data.timestamp.seconds)
+                date = new Date(data.timestamp.seconds * 1000);
+              else if (typeof data.timestamp === "string")
+                date = new Date(data.timestamp);
+
+              if (date && date.getDay() === 1) threshold = "10:00:00";
+            }
+
+            if (timeStr > threshold) {
               isLate = true;
             }
           } else if (data.type === "check-out") {
@@ -406,6 +436,8 @@ export default function DashboardEmployee() {
 
       return { bg: "bg-blue-100", text: "text-blue-800", label: label };
     }
+    if (status === "pending")
+      return { bg: "bg-gray-100", text: "text-gray-800", label: "Belum Absen" };
     if (status === "absent")
       return { bg: "bg-red-100", text: "text-red-800", label: "Tidak Hadir" };
     if (isLate)

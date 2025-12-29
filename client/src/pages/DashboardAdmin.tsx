@@ -175,6 +175,7 @@ export default function DashboardAdmin() {
 
           // Handle different timestamp formats
           let checkInTime = "00:00:00";
+          let checkInDate: Date | null = null;
 
           if (data.timestamp) {
             // If it's a Firestore Timestamp object
@@ -182,25 +183,30 @@ export default function DashboardAdmin() {
               data.timestamp.toDate &&
               typeof data.timestamp.toDate === "function"
             ) {
-              const date = data.timestamp.toDate();
-              checkInTime = date.toTimeString().split(" ")[0]; // Get HH:MM:SS
+              checkInDate = data.timestamp.toDate();
+              checkInTime = checkInDate!.toTimeString().split(" ")[0]; // Get HH:MM:SS
             }
             // If it's a timestamp with seconds property
             else if (data.timestamp.seconds) {
-              const date = new Date(data.timestamp.seconds * 1000);
-              checkInTime = date.toTimeString().split(" ")[0];
+              checkInDate = new Date(data.timestamp.seconds * 1000);
+              checkInTime = checkInDate!.toTimeString().split(" ")[0];
             }
             // If it's already a string
             else if (typeof data.timestamp === "string") {
+              checkInDate = new Date(data.timestamp);
               checkInTime = data.timestamp.split("T")[1] || "00:00:00";
             }
           }
 
-          // Check if late using status or legacy time check
+          // Check if late using strict time check (ignoring potential false 'late' status in DB)
           let isLate = false;
-          if (data.status === "late") {
-            isLate = true;
-          } else if (checkInTime > "11:00:00") {
+
+          let threshold = "09:00:00";
+          if (checkInDate && checkInDate.getDay() === 1) {
+            threshold = "10:00:00";
+          }
+
+          if (checkInTime > threshold) {
             isLate = true;
           }
 
@@ -449,9 +455,9 @@ export default function DashboardAdmin() {
         let isLate = false;
         if (day === 1) {
           // Monday
-          if (timeDecimal > 8.5) isLate = true; // > 08:30
+          if (timeDecimal > 10.0) isLate = true; // > 10:00
         } else {
-          if (timeDecimal > 7.5) isLate = true; // > 07:30
+          if (timeDecimal > 9.0) isLate = true; // > 09:00
         }
 
         promises.push(

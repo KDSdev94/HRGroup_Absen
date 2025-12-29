@@ -151,7 +151,7 @@ export default function Scan() {
       if (day === 1) {
         // Monday special hours
         CHECK_IN_START = 8.5; // 08:30
-        CHECK_IN_END = 12.0; // 10:00
+        CHECK_IN_END = 10.0; // 10:00
       }
 
       if (checkInSnapshot.empty) {
@@ -164,7 +164,7 @@ export default function Scan() {
           );
           setExpectedAttendanceType("check-in"); // Still set type but disable button
         } else if (currentTime > CHECK_IN_END) {
-          const endTime = day === 1 ? "12:00" : "09:00";
+          const endTime = day === 1 ? "10:00" : "09:00";
           setIsWithinTimeWindow(false);
           setTimeMessage(
             `Absen masuk sudah ditutup. Berakhir pukul ${endTime} WIB.`
@@ -206,7 +206,6 @@ export default function Scan() {
           setExpectedAttendanceType("check-out");
         }
       } else {
-        // Already done for today
         // Already done for today
         setIsWithinTimeWindow(false);
         setTimeMessage(null);
@@ -278,7 +277,7 @@ export default function Scan() {
             config,
             {
               fps: 30, // Increased FPS for better detection
-              qrbox: qrboxSize, // Use calculated size
+              // qrbox removed - we use custom overlay instead
               aspectRatio: 1.0, // Square aspect ratio
               disableFlip: false, // Allow flipping for better detection
             },
@@ -438,8 +437,11 @@ export default function Scan() {
       });
     } finally {
       setProcessing(false);
+      // Reset file input to allow re-upload of same file
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+        // Blur to close file picker dialog
+        fileInputRef.current.blur();
       }
     }
   };
@@ -585,8 +587,17 @@ export default function Scan() {
 
       // Determine what type of attendance is allowed based on time and existing records
       if (checkInSnapshot.empty) {
-        // No check-in yet - must be check-in time
-        // Format time for error messages
+        // No check-in yet - TESTING: Always allow check-in
+        attendanceType = "check-in";
+
+        // Determine if late based on time (for status marking only, not blocking)
+        if (currentTime > CHECK_IN_END) {
+          successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil (Terlambat).`;
+        } else {
+          successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
+        }
+
+        /* PRODUCTION CODE - Uncomment to enable time restrictions:
         const checkInStartTime = day === 1 ? "08:30" : "07:30";
         const checkInEndTime = day === 1 ? "10:00" : "09:00";
 
@@ -614,8 +625,13 @@ export default function Scan() {
           // On-time check-in
           successMessage = `Selamat Pagi, ${data.name}! Absen Masuk berhasil.`;
         }
+        */
       } else if (checkOutSnapshot.empty) {
-        // Check-in exists, no check-out yet - must be check-out time
+        // Check-in exists, no check-out yet - TESTING: Always allow check-out
+        attendanceType = "check-out";
+        successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
+
+        /* PRODUCTION CODE - Uncomment to enable time restrictions:
         const checkOutStartTime = day === 6 ? "11:30" : "15:30";
         const checkOutEndTime = day === 6 ? "12:30" : "16:30";
 
@@ -631,9 +647,10 @@ export default function Scan() {
         }
         attendanceType = "check-out";
         successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
+        */
       } else {
         // Already checked out
-        throw new Error("Error: You have already checked outs");
+        throw new Error("Error: Anda sudah absen pulang");
       }
 
       // Get Location - HIGH ACCURACY MODE with Reverse Geocoding
@@ -747,8 +764,8 @@ export default function Scan() {
       toast({
         title:
           attendanceType === "check-in"
-            ? "✅ Absen Masuk Berhasil"
-            : "✅ Absen Pulang Berhasil",
+            ? "✅ Yeeyy, Absen Masuk Berhasil"
+            : "✅ Yeeyy, Absen Pulang Berhasil",
         description: `${data.name} - ${data.division}\n${displayTime} WIB\n${locationStatus}\n✓ Data tersimpan ke database`,
         duration: 5000,
       });
@@ -809,296 +826,284 @@ export default function Scan() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header - Compact for mobile */}
-      <div className="text-center space-y-1">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Scan Absensi
-        </h1>
-        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">
-          Arahkan QR code ke kamera
-        </p>
-      </div>
+    <>
+      {/* Mobile Fullscreen Layout */}
+      <div className="md:hidden fixed inset-0 bg-black flex flex-col">
+        {/* Header with Title */}
+        <div className="absolute top-0 left-0 right-0 z-50 bg-linear-to-b from-black/80 to-transparent p-4 flex items-center gap-3">
+          <button onClick={() => window.history.back()} className="text-white">
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+          <h1 className="text-xl font-bold text-white">Scan QRIS</h1>
+        </div>
 
-      <Card className="overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-xl">
-        <CardContent className="p-0">
-          {!scanResult ? (
-            <div className="bg-black relative min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center text-white p-3 md:p-4">
-              {/* Scanner Container */}
-              <div className="relative w-full">
+        {/* Camera/Scanner Area - Fullscreen */}
+        <div className="relative flex-1">
+          <div
+            id="reader"
+            className={`w-full h-full ${
+              isCameraActive || processing ? "" : "hidden"
+            }`}
+          ></div>
+
+          {/* Gradient Overlay - Darker at edges, transparent in center */}
+          {isCameraActive && !processing && (
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Box Overlay - Dark outside, transparent inside */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Top dark overlay */}
                 <div
-                  id="reader"
-                  className={`w-full rounded-lg overflow-hidden min-h-[300px] ${
-                    isCameraActive || processing ? "" : "hidden"
-                  }`}
+                  className="absolute top-0 left-0 right-0 bg-black/70"
+                  style={{ height: "calc(50% - 144px)" }}
                 ></div>
 
-                {/* Camera Overlays */}
-                {isCameraActive && !processing && (
-                  <>
-                    {/* Tap to Focus Area */}
-                    <div
-                      className="absolute inset-0 z-10 cursor-crosshair"
-                      onClick={handleTapToFocus}
-                    >
-                      {/* Focus Indicator */}
-                      {focusPoint && (
-                        <div
-                          className="absolute w-16 h-16 border-2 border-yellow-400 rounded-sm transform -translate-x-1/2 -translate-y-1/2 animate-ping pointer-events-none"
-                          style={{
-                            left: focusPoint.x,
-                            top: focusPoint.y,
-                          }}
-                        />
-                      )}
-                    </div>
+                {/* Bottom dark overlay */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 bg-black/70"
+                  style={{ height: "calc(50% - 144px)" }}
+                ></div>
 
-                    {/* Flashlight Button */}
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute top-4 right-4 z-20 bg-black/50 text-white hover:bg-black/70 border border-white/20"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent focus trigger
-                        toggleTorch();
-                      }}
-                    >
-                      {torchOn ? (
-                        <Zap className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                      ) : (
-                        <ZapOff className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </>
-                )}
+                {/* Left dark overlay */}
+                <div
+                  className="absolute left-0 bg-black/70"
+                  style={{
+                    top: "calc(50% - 144px)",
+                    bottom: "calc(50% - 144px)",
+                    width: "calc(50% - 144px)",
+                  }}
+                ></div>
+
+                {/* Right dark overlay */}
+                <div
+                  className="absolute right-0 bg-black/70"
+                  style={{
+                    top: "calc(50% - 144px)",
+                    bottom: "calc(50% - 144px)",
+                    width: "calc(50% - 144px)",
+                  }}
+                ></div>
               </div>
 
-              {/* Controls - Show when camera is not active */}
-              {!isCameraActive && !processing && (
-                <div className="flex flex-col items-center gap-4 w-full max-w-sm">
-                  {/* Status Badge */}
-                  {isSunday ? (
-                    <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-red-500/20 text-red-400 border border-red-500/30">
-                      🚫 Hari Minggu - Absensi Libur
-                    </div>
-                  ) : timeMessage ? (
-                    <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                      ⏰ {timeMessage}
-                    </div>
-                  ) : expectedAttendanceType ? (
-                    <div
-                      className={`px-4 py-2 rounded-full text-sm font-semibold mb-2 ${
-                        expectedAttendanceType === "check-in"
-                          ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                          : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                      }`}
-                    >
-                      {expectedAttendanceType === "check-in"
-                        ? "🌅 Absen Masuk"
-                        : "🌆 Absen Pulang"}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                      ✅ Absen Hari Ini Sudah Selesai
-                    </div>
-                  )}
-
-                  <div
-                    className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 ${
-                      expectedAttendanceType === "check-in"
-                        ? "bg-green-500/20"
-                        : expectedAttendanceType === "check-out"
-                        ? "bg-orange-500/20"
-                        : "bg-gray-500/20"
-                    }`}
-                  >
-                    <Camera
-                      className={`w-10 h-10 ${
-                        expectedAttendanceType === "check-in"
-                          ? "text-green-400"
-                          : expectedAttendanceType === "check-out"
-                          ? "text-orange-400"
-                          : "text-gray-400"
-                      }`}
-                    />
-                  </div>
-
-                  <Button
-                    onClick={startScanning}
-                    size="lg"
-                    className={`w-full text-base font-semibold ${
-                      isSunday || !isWithinTimeWindow
-                        ? "bg-gray-500 cursor-not-allowed"
-                        : expectedAttendanceType === "check-in"
-                        ? "bg-green-600 hover:bg-green-700"
-                        : expectedAttendanceType === "check-out"
-                        ? "bg-orange-600 hover:bg-orange-700"
-                        : ""
-                    }`}
-                    disabled={
-                      isSunday ||
-                      !isWithinTimeWindow ||
-                      expectedAttendanceType === null ||
-                      processing
-                    }
-                  >
-                    {processing ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Memulai Kamera...
-                      </>
-                    ) : isSunday ? (
-                      <>
-                        <AlertTriangle className="mr-2 h-5 w-5" />
-                        Absens Gak Tersedia (Hari Libur)
-                      </>
-                    ) : !isWithinTimeWindow ? (
-                      <>
-                        <AlertTriangle className="mr-2 h-5 w-5" />
-                        Belum Waktunya Scan
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="mr-2 h-5 w-5" />
-                        {expectedAttendanceType === "check-in"
-                          ? "Scan Absen Masuk"
-                          : expectedAttendanceType === "check-out"
-                          ? "Scan Absen Pulang"
-                          : "Scan"}
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="flex items-center gap-3 w-full">
-                    <div className="flex-1 h-px bg-gray-700"></div>
-                    <span className="text-xs text-gray-400">ATAU</span>
-                    <div className="flex-1 h-px bg-gray-700"></div>
-                  </div>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="qr-file-input"
-                  />
-                  <label
-                    htmlFor="qr-file-input"
-                    className="w-full cursor-pointer"
-                  >
-                    <div className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-secondary hover:bg-accent text-foreground rounded-lg font-semibold transition-all border-2 border-border">
-                      <Upload className="h-5 w-5" />
-                      Upload QR Code
-                    </div>
-                  </label>
+              {/* Orange Corner Brackets - Larger to cover library's white corners */}
+              <div className="absolute inset-0 flex items-center justify-center z-20">
+                <div className="relative w-72 h-72">
+                  {/* Top Left */}
+                  <div className="absolute top-0 left-0 w-16 h-16 border-t-[6px] border-l-[6px] border-orange-500"></div>
+                  {/* Top Right */}
+                  <div className="absolute top-0 right-0 w-16 h-16 border-t-[6px] border-r-[6px] border-orange-500"></div>
+                  {/* Bottom Left */}
+                  <div className="absolute bottom-0 left-0 w-16 h-16 border-b-[6px] border-l-[6px] border-orange-500"></div>
+                  {/* Bottom Right */}
+                  <div className="absolute bottom-0 right-0 w-16 h-16 border-b-[6px] border-r-[6px] border-orange-500"></div>
                 </div>
-              )}
+              </div>
 
-              {/* Processing State */}
-              {processing && (
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-primary" />
-                  <p className="text-base md:text-lg font-medium text-gray-300">
-                    Memproses...
-                  </p>
-                </div>
-              )}
-
-              {/* Camera Active - Show Stop Button */}
-              {isCameraActive && !processing && (
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                  <Button
-                    onClick={stopScanning}
-                    variant="destructive"
-                    size="lg"
-                    className="shadow-lg"
-                  >
-                    Stop Scan
-                  </Button>
-                </div>
-              )}
-
-              {/* Hint Text */}
-              {isCameraActive && !processing && (
-                <p className="text-xs md:text-sm text-gray-400 mt-3 text-center absolute top-4">
-                  💡 Pastikan pencahayaan cukup
+              {/* Scan Text */}
+              <div className="absolute bottom-32 left-0 right-0 text-center">
+                <p className="text-white text-sm font-medium bg-black/50 inline-block px-4 py-2 rounded-full">
+                  Scan absen HRGroup
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Tap to Focus */}
+          {isCameraActive && !processing && (
+            <div
+              className="absolute inset-0 z-10 cursor-crosshair"
+              onClick={handleTapToFocus}
+            >
+              {focusPoint && (
+                <div
+                  className="absolute w-16 h-16 border-2 border-yellow-400 rounded-sm transform -translate-x-1/2 -translate-y-1/2 animate-ping pointer-events-none"
+                  style={{
+                    left: focusPoint.x,
+                    top: focusPoint.y,
+                  }}
+                />
               )}
             </div>
-          ) : (
-            <div className="min-h-[350px] md:min-h-[400px] flex flex-col items-center justify-center p-4 md:p-8 text-center space-y-4 md:space-y-6 bg-linear-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-900/50 dark:to-gray-800/30">
+          )}
+
+          {/* Controls - Show when camera is not active */}
+          {!isCameraActive && !processing && !scanResult && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
+              {/* Status Badge */}
+              {isSunday ? (
+                <div className="px-4 py-2 rounded-full text-sm font-semibold bg-red-500/20 text-red-400 border border-red-500/30">
+                  🚫 Hari Minggu - Absensi Libur
+                </div>
+              ) : timeMessage ? (
+                <div className="px-4 py-2 rounded-full text-sm font-semibold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                  ⏰ {timeMessage}
+                </div>
+              ) : expectedAttendanceType ? (
+                <div
+                  className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                    expectedAttendanceType === "check-in"
+                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                      : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                  }`}
+                >
+                  {expectedAttendanceType === "check-in"
+                    ? "🌅 Absen Masuk"
+                    : "🌆 Absen Pulang"}
+                </div>
+              ) : (
+                <div className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                  ✅ Sudah Absen, Selamat Beristirahat!
+                </div>
+              )}
+
+              <div
+                className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                  expectedAttendanceType === "check-in"
+                    ? "bg-green-500/20"
+                    : expectedAttendanceType === "check-out"
+                    ? "bg-orange-500/20"
+                    : "bg-gray-500/20"
+                }`}
+              >
+                <Camera
+                  className={`w-10 h-10 ${
+                    expectedAttendanceType === "check-in"
+                      ? "text-green-400"
+                      : expectedAttendanceType === "check-out"
+                      ? "text-orange-400"
+                      : "text-gray-400"
+                  }`}
+                />
+              </div>
+
+              <Button
+                onClick={startScanning}
+                size="lg"
+                className={`w-full max-w-xs text-base font-semibold ${
+                  isSunday
+                    ? "bg-gray-500 cursor-not-allowed"
+                    : expectedAttendanceType === "check-in"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : expectedAttendanceType === "check-out"
+                    ? "bg-orange-600 hover:bg-orange-700"
+                    : ""
+                }`}
+                disabled={
+                  isSunday || expectedAttendanceType === null || processing
+                }
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Memulai Kamera...
+                  </>
+                ) : isSunday ? (
+                  <>
+                    <AlertTriangle className="mr-2 h-5 w-5" />
+                    Absen Tidak Tersedia
+                  </>
+                ) : (
+                  <>
+                    <Camera className="mr-2 h-5 w-5" />
+                    {expectedAttendanceType === "check-in"
+                      ? "Scan Absen Masuk"
+                      : expectedAttendanceType === "check-out"
+                      ? "Scan Absen Pulang"
+                      : "Scan"}
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Processing State */}
+          {processing && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50">
+              <Loader2 className="h-12 w-12 animate-spin text-white" />
+              <p className="text-lg font-medium text-white">Memproses...</p>
+            </div>
+          )}
+
+          {/* Success/Error Result */}
+          {scanResult && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-black/90">
               {scanResult?.error ? (
                 <>
-                  <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 animate-in zoom-in duration-300">
-                    <AlertTriangle className="h-8 w-8 md:h-10 md:w-10" />
+                  <div className="h-20 w-20 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 animate-in zoom-in duration-300 mb-4">
+                    <AlertTriangle className="h-10 w-10" />
                   </div>
-                  <div className="space-y-1 px-2">
-                    <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-                      Gagal
-                    </h2>
-                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 max-w-sm">
-                      {scanResult.error}
-                    </p>
-                  </div>
-                  <Button onClick={resetScan} size="lg" className="mt-2">
+                  <h2 className="text-2xl font-bold text-white mb-2">Gagal</h2>
+                  <p className="text-base text-gray-300 max-w-sm text-center mb-6">
+                    {scanResult.error}
+                  </p>
+                  <Button
+                    onClick={resetScan}
+                    size="lg"
+                    className="w-full max-w-xs"
+                  >
                     <RefreshCcw className="mr-2 h-4 w-4" /> Coba Lagi
                   </Button>
                 </>
               ) : (
                 <>
-                  <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 animate-in zoom-in duration-300">
-                    <CheckCircle2 className="h-8 w-8 md:h-10 md:w-10" />
+                  <div className="h-20 w-20 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 animate-in zoom-in duration-300 mb-4">
+                    <CheckCircle2 className="h-10 w-10" />
                   </div>
+                  <h2 className="text-2xl font-bold text-white mb-1">
+                    {scanResult?.type === "check-out"
+                      ? "✅ Absen Pulang"
+                      : "✅ Absen Masuk"}
+                  </h2>
+                  <p className="text-base text-gray-300 mb-6">
+                    {new Date().toLocaleTimeString("id-ID", {
+                      timeZone: "Asia/Jakarta",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })}{" "}
+                    WIB
+                  </p>
 
-                  {/* Success Message - Compact */}
-                  <div className="space-y-1 px-2">
-                    <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-                      {scanResult?.type === "check-out"
-                        ? "✅ Absen Pulang"
-                        : "✅ Absen Masuk"}
-                    </h2>
-                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400">
-                      {new Date().toLocaleTimeString("id-ID", {
-                        timeZone: "Asia/Jakarta",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                      })}{" "}
-                      WIB
-                    </p>
-                  </div>
-
-                  {/* Info Card - Compact & Clean */}
-                  <Card className="w-full max-w-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-                    <CardContent className="p-3 md:p-4 space-y-2.5">
+                  <Card className="w-full max-w-sm border border-gray-700 bg-gray-800 shadow-lg mb-6">
+                    <CardContent className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        <span className="text-xs text-gray-400 uppercase tracking-wide">
                           Nama
                         </span>
-                        <p className="font-semibold text-sm md:text-base text-gray-900 dark:text-white">
+                        <p className="font-semibold text-base text-white">
                           {scanResult?.name}
                         </p>
                       </div>
-                      <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="h-px bg-gray-700"></div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        <span className="text-xs text-gray-400 uppercase tracking-wide">
                           Divisi
                         </span>
-                        <p className="text-sm md:text-base text-gray-700 dark:text-gray-300">
+                        <p className="text-base text-gray-300">
                           {scanResult?.division}
                         </p>
                       </div>
-                      <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="h-px bg-gray-700"></div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        <span className="text-xs text-gray-400 uppercase tracking-wide">
                           Status
                         </span>
                         <span
-                          className={`text-xs md:text-sm font-semibold px-2.5 py-1 rounded-full ${
+                          className={`text-sm font-semibold px-3 py-1 rounded-full ${
                             scanResult?.type === "check-out"
-                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              ? "bg-orange-500/20 text-orange-400"
+                              : "bg-green-500/20 text-green-400"
                           }`}
                         >
                           {scanResult?.type === "check-out"
@@ -1112,7 +1117,7 @@ export default function Scan() {
                   <Button
                     onClick={resetScan}
                     size="lg"
-                    className="mt-2 w-full max-w-sm"
+                    className="w-full max-w-xs"
                   >
                     <RefreshCcw className="mr-2 h-4 w-4" /> Scan Berikutnya
                   </Button>
@@ -1120,8 +1125,334 @@ export default function Scan() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        {/* Bottom Controls - Flash & Gallery */}
+        {isCameraActive && !processing && !scanResult && (
+          <div className="absolute bottom-8 left-0 right-0 flex items-center justify-between px-12 z-20">
+            {/* Flash Button */}
+            <button
+              onClick={toggleTorch}
+              className="flex flex-col items-center gap-2"
+            >
+              <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                {torchOn ? (
+                  <Zap className="h-6 w-6 text-yellow-400 fill-yellow-400" />
+                ) : (
+                  <ZapOff className="h-6 w-6 text-white" />
+                )}
+              </div>
+              <span className="text-xs text-white font-medium">Flash</span>
+            </button>
+
+            {/* Gallery Button */}
+            <label
+              htmlFor="qr-file-input-mobile"
+              className="flex flex-col items-center gap-2 cursor-pointer"
+            >
+              <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                <Upload className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-xs text-white font-medium">Galeri</span>
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="qr-file-input-mobile"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Layout - Keep original card-based design */}
+      <div className="hidden md:block max-w-2xl mx-auto space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="text-center space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Scan Absensi
+          </h1>
+          <p className="text-base text-gray-500 dark:text-gray-400">
+            Arahkan QR code ke kamera
+          </p>
+        </div>
+
+        <Card className="overflow-hidden border-2 border-gray-100 dark:border-gray-800 shadow-xl">
+          <CardContent className="p-0">
+            {!scanResult ? (
+              <div className="bg-black relative min-h-[400px] flex flex-col items-center justify-center text-white p-4">
+                <div className="relative w-full">
+                  <div
+                    id="reader"
+                    className={`w-full rounded-lg overflow-hidden min-h-[300px] ${
+                      isCameraActive || processing ? "" : "hidden"
+                    }`}
+                  ></div>
+
+                  {isCameraActive && !processing && (
+                    <>
+                      <div
+                        className="absolute inset-0 z-10 cursor-crosshair"
+                        onClick={handleTapToFocus}
+                      >
+                        {focusPoint && (
+                          <div
+                            className="absolute w-16 h-16 border-2 border-yellow-400 rounded-sm transform -translate-x-1/2 -translate-y-1/2 animate-ping pointer-events-none"
+                            style={{
+                              left: focusPoint.x,
+                              top: focusPoint.y,
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute top-4 right-4 z-20 bg-black/50 text-white hover:bg-black/70 border border-white/20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTorch();
+                        }}
+                      >
+                        {torchOn ? (
+                          <Zap className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                        ) : (
+                          <ZapOff className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {!isCameraActive && !processing && (
+                  <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+                    {isSunday ? (
+                      <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-red-500/20 text-red-400 border border-red-500/30">
+                        🚫 Hari Minggu - Absensi Libur
+                      </div>
+                    ) : timeMessage ? (
+                      <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                        ⏰ {timeMessage}
+                      </div>
+                    ) : expectedAttendanceType ? (
+                      <div
+                        className={`px-4 py-2 rounded-full text-sm font-semibold mb-2 ${
+                          expectedAttendanceType === "check-in"
+                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                            : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                        }`}
+                      >
+                        {expectedAttendanceType === "check-in"
+                          ? "🌅 Absen Masuk"
+                          : "🌆 Absen Pulang"}
+                      </div>
+                    ) : (
+                      <div className="px-4 py-2 rounded-full text-sm font-semibold mb-2 bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                        ✅ Absen Hari Ini Sudah Selesai
+                      </div>
+                    )}
+
+                    <div
+                      className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 ${
+                        expectedAttendanceType === "check-in"
+                          ? "bg-green-500/20"
+                          : expectedAttendanceType === "check-out"
+                          ? "bg-orange-500/20"
+                          : "bg-gray-500/20"
+                      }`}
+                    >
+                      <Camera
+                        className={`w-10 h-10 ${
+                          expectedAttendanceType === "check-in"
+                            ? "text-green-400"
+                            : expectedAttendanceType === "check-out"
+                            ? "text-orange-400"
+                            : "text-gray-400"
+                        }`}
+                      />
+                    </div>
+
+                    <Button
+                      onClick={startScanning}
+                      size="lg"
+                      className={`w-full text-base font-semibold ${
+                        isSunday
+                          ? "bg-gray-500 cursor-not-allowed"
+                          : expectedAttendanceType === "check-in"
+                          ? "bg-green-600 hover:bg-green-700"
+                          : expectedAttendanceType === "check-out"
+                          ? "bg-orange-600 hover:bg-orange-700"
+                          : ""
+                      }`}
+                      disabled={
+                        isSunday ||
+                        expectedAttendanceType === null ||
+                        processing
+                      }
+                    >
+                      {processing ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Memulai Kamera...
+                        </>
+                      ) : isSunday ? (
+                        <>
+                          <AlertTriangle className="mr-2 h-5 w-5" />
+                          Absen Tidak Tersedia
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="mr-2 h-5 w-5" />
+                          {expectedAttendanceType === "check-in"
+                            ? "Scan Absen Masuk"
+                            : expectedAttendanceType === "check-out"
+                            ? "Scan Absen Pulang"
+                            : "Scan"}
+                        </>
+                      )}
+                    </Button>
+
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="flex-1 h-px bg-gray-700"></div>
+                      <span className="text-xs text-gray-400">ATAU</span>
+                      <div className="flex-1 h-px bg-gray-700"></div>
+                    </div>
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="qr-file-input-desktop"
+                    />
+                    <label
+                      htmlFor="qr-file-input-desktop"
+                      className="w-full cursor-pointer"
+                    >
+                      <div className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-secondary hover:bg-accent text-foreground rounded-lg font-semibold transition-all border-2 border-border">
+                        <Upload className="h-5 w-5" />
+                        Upload QR Code
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {processing && (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-lg font-medium text-gray-300">
+                      Memproses...
+                    </p>
+                  </div>
+                )}
+
+                {isCameraActive && !processing && (
+                  <>
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                      <Button
+                        onClick={stopScanning}
+                        variant="destructive"
+                        size="lg"
+                        className="shadow-lg"
+                      >
+                        Stop Scan
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-3 text-center absolute top-4">
+                      💡 Pastikan pencahayaan cukup
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center space-y-6 bg-linear-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-900/50 dark:to-gray-800/30">
+                {scanResult?.error ? (
+                  <>
+                    <div className="h-20 w-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 animate-in zoom-in duration-300">
+                      <AlertTriangle className="h-10 w-10" />
+                    </div>
+                    <div className="space-y-1 px-2">
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Gagal
+                      </h2>
+                      <p className="text-base text-gray-600 dark:text-gray-400 max-w-sm">
+                        {scanResult.error}
+                      </p>
+                    </div>
+                    <Button onClick={resetScan} size="lg" className="mt-2">
+                      <RefreshCcw className="mr-2 h-4 w-4" /> Coba Lagi
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 animate-in zoom-in duration-300">
+                      <CheckCircle2 className="h-10 w-10" />
+                    </div>
+
+                    <div className="space-y-1 px-2">
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {scanResult?.type === "check-out"
+                          ? "✅ Absen Pulang"
+                          : "✅ Absen Masuk"}
+                      </h2>
+                      <p className="text-base text-gray-600 dark:text-gray-400">
+                        {new Date().toLocaleTimeString("id-ID", {
+                          timeZone: "Asia/Jakarta",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}{" "}
+                        WIB
+                      </p>
+                    </div>
+
+                    <Card className="w-full max-w-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                      <CardContent className="p-4 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Nama
+                          </span>
+                          <p className="font-semibold text-base text-gray-900 dark:text-white">
+                            {scanResult?.name}
+                          </p>
+                        </div>
+                        <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Divisi
+                          </span>
+                          <p className="text-base text-gray-700 dark:text-gray-300">
+                            {scanResult?.division}
+                          </p>
+                        </div>
+                        <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Status
+                          </span>
+                          <span
+                            className={`text-sm font-semibold px-2.5 py-1 rounded-full ${
+                              scanResult?.type === "check-out"
+                                ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            }`}
+                          >
+                            {scanResult?.type === "check-out"
+                              ? "Pulang"
+                              : "Masuk"}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

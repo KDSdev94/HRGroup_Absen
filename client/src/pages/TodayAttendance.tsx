@@ -159,9 +159,7 @@ export default function TodayAttendance() {
   };
 
   const isLate = (record: AttendanceRecord) => {
-    if (record.status === "late") return true;
-    if (record.status === "on-time") return false;
-
+    // Strictly check time, ignoring stored status which might be incorrect from manual entry
     try {
       const timestamp = record.timestamp;
       let date: Date;
@@ -177,7 +175,13 @@ export default function TodayAttendance() {
       }
 
       const timeString = date.toTimeString().split(" ")[0];
-      return timeString > "11:00:00";
+
+      let threshold = "09:00:00";
+      if (date.getDay() === 1) {
+        threshold = "10:00:00";
+      }
+
+      return timeString > threshold;
     } catch {
       return false;
     }

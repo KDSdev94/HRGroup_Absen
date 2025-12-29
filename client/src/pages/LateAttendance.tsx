@@ -82,35 +82,52 @@ export default function LateAttendance() {
       attendanceSnapshot.docs.forEach((doc) => {
         const data = doc.data() as LateRecord;
 
-        // Check if the check-in is late
+        // Check if the check-in is late - ONLY based on actual time, ignore status field
         let isLate = false;
+        let checkInTime = "00:00:00";
 
-        // 1. Check explicit status (new method)
-        if (data.status === "late") {
+        if (data.timestamp) {
+          if (
+            data.timestamp.toDate &&
+            typeof data.timestamp.toDate === "function"
+          ) {
+            const date = data.timestamp.toDate();
+            checkInTime = date.toTimeString().split(" ")[0];
+          } else if (data.timestamp.seconds) {
+            const date = new Date(data.timestamp.seconds * 1000);
+            checkInTime = date.toTimeString().split(" ")[0];
+          } else if (typeof data.timestamp === "string") {
+            checkInTime = data.timestamp.split("T")[1] || "00:00:00";
+          }
+        }
+
+        // Determine threshold based on day
+        let threshold = "09:00:00";
+        if (data.timestamp) {
+          let date: Date | null = null;
+          if (
+            data.timestamp.toDate &&
+            typeof data.timestamp.toDate === "function"
+          ) {
+            date = data.timestamp.toDate();
+          } else if (data.timestamp.seconds) {
+            date = new Date(data.timestamp.seconds * 1000);
+          } else if (typeof data.timestamp === "string") {
+            date = new Date(data.timestamp);
+          }
+
+          if (date && date.getDay() === 1) {
+            // Monday
+            threshold = "10:00:00";
+          } else {
+            // Others
+            threshold = "09:00:00";
+          }
+        }
+
+        // STRICT CHECK: Only consider late if time is actually past threshold
+        if (checkInTime > threshold) {
           isLate = true;
-        } else {
-          // 2. Fallback: Check time (legacy method)
-          let checkInTime = "00:00:00";
-
-          if (data.timestamp) {
-            if (
-              data.timestamp.toDate &&
-              typeof data.timestamp.toDate === "function"
-            ) {
-              const date = data.timestamp.toDate();
-              checkInTime = date.toTimeString().split(" ")[0];
-            } else if (data.timestamp.seconds) {
-              const date = new Date(data.timestamp.seconds * 1000);
-              checkInTime = date.toTimeString().split(" ")[0];
-            } else if (typeof data.timestamp === "string") {
-              checkInTime = data.timestamp.split("T")[1] || "00:00:00";
-            }
-          }
-
-          // If check-in time is after 11:00:00, it's late (legacy threshold)
-          if (checkInTime > "11:00:00") {
-            isLate = true;
-          }
         }
 
         if (isLate) {
@@ -190,14 +207,26 @@ export default function LateAttendance() {
         return "-";
       }
 
-      // Calculate difference from 11:00 AM
+      // Calculate difference based on day
       const checkInTime = date.getTime();
       const today = new Date(date);
-      today.setHours(11, 0, 0, 0);
+      const day = today.getDay();
+
+      // Monday: 10:00, Others: 09:00
+      if (day === 1) {
+        today.setHours(10, 0, 0, 0);
+      } else {
+        today.setHours(9, 0, 0, 0);
+      }
+
       const targetTime = today.getTime();
 
       const diffMs = checkInTime - targetTime;
       const diffMins = Math.floor(diffMs / 60000);
+
+      if (diffMins <= 0) {
+        return "-";
+      }
 
       if (diffMins < 60) {
         return `${diffMins} menit`;
@@ -269,7 +298,6 @@ export default function LateAttendance() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-600" />
             <AlertCircle className="h-5 w-5 text-amber-600" />
             Daftar Keterlambatan (
             {
