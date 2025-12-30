@@ -17,10 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, XCircle, UserX, LogOut } from "lucide-react";
+import { ArrowLeft, XCircle, UserX, LogOut, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface Employee {
   id: string;
@@ -28,6 +36,7 @@ interface Employee {
   division?: string;
   employeeId?: string;
   batch?: string;
+  checkInDocId?: string;
 }
 
 interface AttendanceRecord {
@@ -36,6 +45,7 @@ interface AttendanceRecord {
 }
 
 export default function AbsentToday() {
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [notCheckedIn, setNotCheckedIn] = useState<Employee[]>([]);
   const [filterBatch, setFilterBatch] = useState("all");
@@ -92,13 +102,13 @@ export default function AbsentToday() {
         }
       });
 
-      const checkInEmployeeIds = new Set<string>();
+      const checkInMap = new Map<string, string>(); // employeeId -> docId
       const checkOutEmployeeIds = new Set<string>();
 
       attendanceSnapshot.docs.forEach((doc) => {
         const data = doc.data() as AttendanceRecord;
         if (data.type === "check-in") {
-          checkInEmployeeIds.add(data.employeeId);
+          checkInMap.set(data.employeeId, doc.id);
         } else if (data.type === "check-out") {
           checkOutEmployeeIds.add(data.employeeId);
         }
@@ -107,8 +117,7 @@ export default function AbsentToday() {
       // Find employees who haven't checked in AND don't have approved permission
       const notCheckedInList = allEmployees.filter((emp) => {
         const hasCheckedIn =
-          checkInEmployeeIds.has(emp.id) ||
-          checkInEmployeeIds.has(emp.employeeId || "");
+          checkInMap.has(emp.id) || checkInMap.has(emp.employeeId || "");
         const hasPermission =
           permissionEmployeeIds.has(emp.id) ||
           permissionEmployeeIds.has(emp.employeeId || "");
@@ -117,15 +126,20 @@ export default function AbsentToday() {
       });
 
       // Find employees who checked in but haven't checked out
-      const notCheckedOutList = allEmployees.filter((emp) => {
-        const hasCheckedIn =
-          checkInEmployeeIds.has(emp.id) ||
-          checkInEmployeeIds.has(emp.employeeId || "");
-        const hasCheckedOut =
-          checkOutEmployeeIds.has(emp.id) ||
-          checkOutEmployeeIds.has(emp.employeeId || "");
-        return hasCheckedIn && !hasCheckedOut;
-      });
+      const notCheckedOutList = allEmployees
+        .filter((emp) => {
+          const hasCheckedIn =
+            checkInMap.has(emp.id) || checkInMap.has(emp.employeeId || "");
+          const hasCheckedOut =
+            checkOutEmployeeIds.has(emp.id) ||
+            checkOutEmployeeIds.has(emp.employeeId || "");
+          return hasCheckedIn && !hasCheckedOut;
+        })
+        .map((emp) => ({
+          ...emp,
+          checkInDocId:
+            checkInMap.get(emp.id) || checkInMap.get(emp.employeeId || ""),
+        }));
 
       // Sort alphabetically by name
       notCheckedInList.sort((a, b) => a.name.localeCompare(b.name));
@@ -137,6 +151,32 @@ export default function AbsentToday() {
       // Error fetching absent employees
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteCheckIn = async (docId: string) => {
+    if (
+      !window.confirm(
+        "Apakah Anda yakin ingin menghapus data check-in peserta ini? Status akan kembali menjadi 'Belum Absen Masuk'."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "attendance", docId));
+      toast({
+        title: "Berhasil",
+        description: "Data check-in berhasil dihapus",
+      });
+      fetchAbsentEmployees();
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+      toast({
+        variant: "destructive",
+        title: "Gagal",
+        description: "Gagal menghapus data absensi",
+      });
     }
   };
 
@@ -319,6 +359,7 @@ export default function AbsentToday() {
                         <TableHead>ID Peserta</TableHead>
                         <TableHead>Divisi</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -342,6 +383,20 @@ export default function AbsentToday() {
                               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                                 Masih di Tempat
                               </span>
+                            </TableCell>
+                            <TableCell>
+                              {employee.checkInDocId && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteCheckIn(employee.checkInDocId!)
+                                  }
+                                  title="Hapus Check-in"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

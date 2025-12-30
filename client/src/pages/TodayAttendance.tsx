@@ -17,10 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Clock, CheckCircle2, LogOut } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, LogOut, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface AttendanceRecord {
   id: string;
@@ -35,6 +43,7 @@ interface AttendanceRecord {
 }
 
 export default function TodayAttendance() {
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [checkInRecords, setCheckInRecords] = useState<AttendanceRecord[]>([]);
   const [filterBatch, setFilterBatch] = useState("all");
@@ -187,6 +196,34 @@ export default function TodayAttendance() {
     }
   };
 
+  const handleDelete = async (id: string, type: string) => {
+    if (
+      !window.confirm(
+        `Apakah Anda yakin ingin menghapus data ${
+          type === "check-in" ? "absen masuk" : "absen pulang"
+        } ini?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "attendance", id));
+      toast({
+        title: "Berhasil",
+        description: "Data absensi berhasil dihapus",
+      });
+      fetchTodayAttendance();
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+      toast({
+        variant: "destructive",
+        title: "Gagal",
+        description: "Gagal menghapus data absensi",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
@@ -295,6 +332,7 @@ export default function TodayAttendance() {
                         <TableHead>Divisi</TableHead>
                         <TableHead>Waktu Check-in</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -327,6 +365,17 @@ export default function TodayAttendance() {
                                   Tepat Waktu
                                 </span>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() =>
+                                  handleDelete(record.id, "check-in")
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -365,7 +414,9 @@ export default function TodayAttendance() {
                         <TableHead>No</TableHead>
                         <TableHead>Nama Peserta</TableHead>
                         <TableHead>Divisi</TableHead>
+                        <TableHead>Divisi</TableHead>
                         <TableHead>Waktu Check-out</TableHead>
+                        <TableHead>Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -387,6 +438,17 @@ export default function TodayAttendance() {
                                 <Clock className="h-4 w-4 text-gray-400" />
                                 {formatTime(record.timestamp)}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() =>
+                                  handleDelete(record.id, "check-out")
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
