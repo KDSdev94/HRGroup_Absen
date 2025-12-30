@@ -827,6 +827,13 @@ export default function Scan() {
 
   return (
     <>
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+      />
       {/* Mobile Fullscreen Layout */}
       <div className="md:hidden fixed inset-0 bg-black flex flex-col">
         {/* Header with Title */}
@@ -1024,6 +1031,16 @@ export default function Scan() {
                   </>
                 )}
               </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full max-w-xs mt-3 bg-white/10 border-white/20 text-white hover:bg-white/20"
+                disabled={processing}
+              >
+                <Upload className="mr-2 h-5 w-5" />
+                Upload QR dari Galeri
+              </Button>
             </div>
           )}
 
@@ -1146,23 +1163,15 @@ export default function Scan() {
             </button>
 
             {/* Gallery Button */}
-            <label
-              htmlFor="qr-file-input-mobile"
-              className="flex flex-col items-center gap-2 cursor-pointer"
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex flex-col items-center gap-2"
             >
               <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20">
                 <Upload className="h-6 w-6 text-white" />
               </div>
               <span className="text-xs text-white font-medium">Galeri</span>
-            </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="qr-file-input-mobile"
-            />
+            </button>
           </div>
         )}
       </div>
@@ -1320,22 +1329,15 @@ export default function Scan() {
                       <div className="flex-1 h-px bg-gray-700"></div>
                     </div>
 
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="qr-file-input-desktop"
-                    />
-                    <label
-                      htmlFor="qr-file-input-desktop"
-                      className="w-full cursor-pointer"
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full"
                     >
                       <div className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-secondary hover:bg-accent text-foreground rounded-lg font-semibold transition-all border-2 border-border">
                         <Upload className="h-5 w-5" />
                         Upload QR Code
                       </div>
-                    </label>
+                    </button>
                   </div>
                 )}
 
