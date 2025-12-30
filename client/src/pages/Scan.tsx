@@ -15,7 +15,7 @@ import {
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
-  addDoc,
+  setDoc,
   serverTimestamp,
   query,
   where,
@@ -720,13 +720,14 @@ export default function Scan() {
       console.log("📍 Saving attendance with location:", attendanceData);
 
       try {
-        const docRef = await addDoc(
-          collection(db, "attendance"),
-          attendanceData
-        );
+        // Use setDoc with a deterministic ID to prevent duplicates
+        // ID Format: EMPLOYEE_ID + DATE + TYPE (e.g., EMP123_2025-01-01_check-in)
+        const docId = `${data.id}_${dateString}_${attendanceType}`;
+        await setDoc(doc(db, "attendance", docId), attendanceData);
+
         console.log(
           "✅ Attendance saved successfully to Firebase with ID:",
-          docRef.id
+          docId
         );
       } catch (saveError: any) {
         console.error("❌ Error saving to Firebase:", saveError);
