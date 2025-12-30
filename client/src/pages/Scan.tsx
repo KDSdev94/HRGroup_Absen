@@ -627,7 +627,15 @@ export default function Scan() {
         }
         */
       } else if (checkOutSnapshot.empty) {
-        // Check-in exists, no check-out yet - TESTING: Always allow check-out
+        // Check-in exists, no check-out yet
+        const checkOutStartTime = day === 6 ? "11:30" : "15:30";
+
+        if (currentTime < CHECK_OUT_START) {
+          throw new Error(
+            `Absen pulang belum dibuka. Dimulai pukul ${checkOutStartTime} WIB.`
+          );
+        }
+
         attendanceType = "check-out";
         successMessage = `Selamat Jalan, ${data.name}! Absen Pulang berhasil.`;
 
@@ -1007,7 +1015,10 @@ export default function Scan() {
                     : ""
                 }`}
                 disabled={
-                  isSunday || expectedAttendanceType === null || processing
+                  isSunday ||
+                  expectedAttendanceType === null ||
+                  processing ||
+                  !isWithinTimeWindow
                 }
               >
                 {processing ? (
@@ -1298,7 +1309,8 @@ export default function Scan() {
                       disabled={
                         isSunday ||
                         expectedAttendanceType === null ||
-                        processing
+                        processing ||
+                        !isWithinTimeWindow
                       }
                     >
                       {processing ? (
